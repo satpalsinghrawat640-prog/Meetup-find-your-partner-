@@ -1,0 +1,4372 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>MeetUp — अपना मैच ढूंढो</title>
+  <meta name="description" content="MeetUp: मोबाइल-फ़र्स्ट हिंदी डेटिंग ऐप (Firebase Auth और Firestore के साथ)।" />
+  <meta property="og:title" content="MeetUp — अपना मैच ढूंढो" />
+  <meta property="og:description" content="MeetUp: अपना मैच ढूंढो 💕 — सही हमसफ़र और नए कनेक्शन की शुरुआत।" />
+  <meta property="og:type" content="website" />
+  <meta name="theme-color" content="#8e2de2" />
+
+  <!-- Google Fonts for clean Devanagari & Latin typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ===========================
+       1. DESIGN TOKENS & RESET
+       =========================== */
+    :root {
+      --purple: #8e2de2;
+      --pink: #ff2d7a;
+      --coral: #ff7a59;
+      --grad: linear-gradient(135deg, #8e2de2 0%, #ff2d7a 52%, #ff7a59 100%);
+      --grad-soft: linear-gradient(135deg, rgba(142, 45, 226, 0.12) 0%, rgba(255, 45, 122, 0.12) 52%, rgba(255, 122, 89, 0.12) 100%);
+      --bg: #f7f4f9;
+      --surface: #ffffff;
+      --surface-muted: #f2eef6;
+      --text: #1c1625;
+      --text-muted: #6e647a;
+      --border: rgba(28, 22, 37, 0.08);
+      --shadow-sm: 0 6px 20px rgba(28, 22, 37, 0.07);
+      --shadow-md: 0 14px 34px rgba(142, 45, 226, 0.14);
+      --shadow-lg: 0 22px 48px rgba(28, 22, 37, 0.18);
+      --radius-card: 24px;
+      --radius-lg: 28px;
+      --radius-md: 20px;
+      --green: #16a34a;
+      --red: #e11d48;
+      --blue: #2563eb;
+      --gold: #f59e0b;
+      --font: "Plus Jakarta Sans", "Noto Sans Devanagari", system-ui, -apple-system, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      font-family: var(--font);
+      background: #efeaf4;
+      color: var(--text);
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button, input, select, textarea {
+      font-family: inherit;
+      outline: none;
+    }
+
+    button {
+      cursor: pointer;
+      border: none;
+      background: none;
+    }
+
+    button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+      box-shadow: 0 0 0 3px rgba(255, 45, 122, 0.35);
+    }
+
+    img {
+      display: block;
+      max-width: 100%;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .tabular {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ===========================
+       2. MOBILE-FIRST APP SHELL
+       =========================== */
+    .shell-outer {
+      width: 100%;
+      height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at top left, rgba(142, 45, 226, 0.14), transparent 50%),
+                  radial-gradient(circle at bottom right, rgba(255, 122, 89, 0.16), transparent 50%),
+                  #efeaf4;
+    }
+
+    .app-frame {
+      position: relative;
+      width: 100%;
+      max-width: 430px;
+      height: 100dvh;
+      background: var(--bg);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: var(--shadow-lg);
+    }
+
+    @media (min-width: 500px) {
+      .app-frame {
+        height: min(94dvh, 860px);
+        border-radius: 32px;
+        border: 1px solid rgba(255, 255, 255, 0.7);
+      }
+    }
+
+    /* ===========================
+       3. LOADING SPLASH & TOASTS
+       =========================== */
+    .splash-screen {
+      position: absolute;
+      inset: 0;
+      z-index: 90;
+      background: var(--grad);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      gap: 16px;
+      transition: opacity 0.25s ease;
+    }
+
+    .spinner {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-top-color: #fff;
+      animation: spin 0.75s linear infinite;
+    }
+
+    .spinner-dark {
+      border-color: rgba(142, 45, 226, 0.18);
+      border-top-color: var(--pink);
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .toast-container {
+      position: absolute;
+      top: calc(14px + env(safe-area-inset-top));
+      left: 16px;
+      right: 16px;
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .toast {
+      background: rgba(28, 22, 37, 0.94);
+      color: #fff;
+      padding: 12px 16px;
+      border-radius: 16px;
+      font-size: 13.5px;
+      font-weight: 600;
+      line-height: 1.4;
+      box-shadow: var(--shadow-md);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      animation: toastIn 0.22s ease;
+      pointer-events: auto;
+    }
+
+    .toast.success { background: #14532d; }
+    .toast.error { background: #9f1239; }
+
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateY(-10px) scale(0.97); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* ===========================
+       4. LOGIN SCREEN (HERO)
+       =========================== */
+    .login-screen {
+      position: relative;
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(155deg, #8e2de2 0%, #ff2d7a 52%, #ff7a59 100%);
+      overflow-y: auto;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: calc(22px + env(safe-area-inset-top)) 22px calc(20px + env(safe-area-inset-bottom));
+      color: #fff;
+    }
+
+    /* Rising floating hearts background */
+    .hearts-layer {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .floating-heart {
+      position: absolute;
+      bottom: -40px;
+      opacity: 0;
+      animation: riseHeart linear infinite;
+      filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.1));
+    }
+
+    @keyframes riseHeart {
+      0% { transform: translateY(0) scale(0.75) rotate(0deg); opacity: 0; }
+      15% { opacity: 0.42; }
+      80% { opacity: 0.3; }
+      100% { transform: translateY(-820px) scale(1.15) rotate(18deg); opacity: 0; }
+    }
+
+    /* 4 round bobbing profile bubbles with emoji faces */
+    .bob-bubble {
+      position: absolute;
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.24);
+      backdrop-filter: blur(8px);
+      border: 2px solid rgba(255, 255, 255, 0.58);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.14);
+      z-index: 1;
+      pointer-events: none;
+      animation: bobFloat 4.2s ease-in-out infinite;
+    }
+
+    .bob-1 { top: 22px; left: 18px; animation-delay: 0s; }
+    .bob-2 { top: 34px; right: 20px; width: 48px; height: 48px; font-size: 22px; animation-delay: 0.9s; }
+    .bob-3 { top: 158px; left: 14px; width: 44px; height: 44px; font-size: 20px; animation-delay: 1.7s; }
+    .bob-4 { top: 144px; right: 14px; width: 52px; height: 52px; font-size: 24px; animation-delay: 2.4s; }
+
+    @keyframes bobFloat {
+      0%, 100% { transform: translateY(0px) rotate(-2deg); }
+      50% { transform: translateY(-10px) rotate(3deg); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .floating-heart, .bob-bubble { animation: none !important; }
+    }
+
+    .login-hero {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      margin-top: 26px;
+      margin-bottom: 18px;
+    }
+
+    .logo-tile {
+      width: 86px;
+      height: 86px;
+      border-radius: 26px;
+      background: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 18px 38px rgba(0, 0, 0, 0.22);
+      margin-bottom: 14px;
+    }
+
+    .login-brand {
+      font-size: 38px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin: 0;
+      line-height: 1.05;
+      text-shadow: 0 4px 16px rgba(0, 0, 0, 0.16);
+    }
+
+    .login-tagline {
+      font-size: 18px;
+      font-weight: 700;
+      margin: 6px 0 4px;
+      color: rgba(255, 255, 255, 0.98);
+    }
+
+    .login-sub {
+      font-size: 13px;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.88);
+      margin: 0;
+      max-width: 280px;
+      line-height: 1.45;
+    }
+
+    .login-form-box {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+      width: 100%;
+    }
+
+    .auth-error-box {
+      background: rgba(15, 10, 22, 0.72);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      color: #ffdbe6;
+      padding: 10px 14px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.4;
+      text-align: center;
+    }
+
+    .glass-input-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .glass-input {
+      width: 100%;
+      height: 52px;
+      border-radius: 20px;
+      border: 1.5px solid rgba(255, 255, 255, 0.4);
+      background: rgba(255, 255, 255, 0.18);
+      backdrop-filter: blur(10px);
+      color: #fff;
+      font-size: 15px;
+      font-weight: 500;
+      padding: 0 18px;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .glass-input::placeholder {
+      color: rgba(255, 255, 255, 0.82);
+    }
+
+    .glass-input:focus {
+      background: rgba(255, 255, 255, 0.26);
+      border-color: #fff;
+    }
+
+    .pw-toggle {
+      position: absolute;
+      right: 10px;
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .btn-white-pill {
+      width: 100%;
+      height: 54px;
+      border-radius: 999px;
+      background: #ffffff;
+      color: var(--pink);
+      font-size: 16px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      box-shadow: 0 14px 28px rgba(0, 0, 0, 0.18);
+      transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+
+    .btn-white-pill:active {
+      transform: scale(0.97);
+    }
+
+    .btn-white-pill:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+
+    .btn-google-pill {
+      width: 100%;
+      height: 52px;
+      border-radius: 999px;
+      background: #ffffff;
+      color: #1f1f1f;
+      font-size: 15px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.14);
+      transition: transform 0.15s ease;
+    }
+
+    .btn-google-pill:active {
+      transform: scale(0.97);
+    }
+
+    .or-divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 2px 0;
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .or-divider::before,
+    .or-divider::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: rgba(255, 255, 255, 0.38);
+    }
+
+    .auth-toggle-btn {
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+      text-align: center;
+      padding: 8px 12px;
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: underline;
+      text-underline-offset: 4px;
+    }
+
+    .age-note {
+      text-align: center;
+      font-size: 12px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.86);
+      margin-top: 2px;
+    }
+
+    /* ===========================
+       5. PROFILE SETUP & FORMS
+       =========================== */
+    .setup-screen {
+      flex: 1;
+      overflow-y: auto;
+      background: var(--bg);
+      padding: calc(20px + env(safe-area-inset-top)) 18px calc(28px + env(safe-area-inset-bottom));
+    }
+
+    .setup-card {
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      padding: 22px 18px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .setup-header {
+      text-align: center;
+      margin-bottom: 18px;
+    }
+
+    .setup-header h2 {
+      margin: 0 0 4px;
+      font-size: 22px;
+      font-weight: 800;
+      background: var(--grad);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .setup-header p {
+      margin: 0;
+      font-size: 13.5px;
+      color: var(--text-muted);
+    }
+
+    .avatar-picker {
+      width: 112px;
+      height: 112px;
+      border-radius: 50%;
+      margin: 0 auto 18px;
+      position: relative;
+      background: var(--grad-soft);
+      border: 3px dashed var(--pink);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      cursor: pointer;
+    }
+
+    .avatar-picker img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .avatar-picker-badge {
+      position: absolute;
+      bottom: 2px;
+      right: 2px;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: var(--grad);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: var(--shadow-sm);
+      border: 2px solid #fff;
+    }
+
+    .field-group {
+      margin-bottom: 14px;
+    }
+
+    .field-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .field-input, .field-select, .field-textarea {
+      width: 100%;
+      border-radius: 18px;
+      border: 1.5px solid var(--border);
+      background: var(--surface-muted);
+      color: var(--text);
+      font-size: 14.5px;
+      font-weight: 500;
+      padding: 12px 14px;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .field-input, .field-select {
+      min-height: 48px;
+    }
+
+    .field-input:focus, .field-select:focus, .field-textarea:focus {
+      background: #fff;
+      border-color: var(--pink);
+    }
+
+    .field-textarea {
+      resize: none;
+      min-height: 88px;
+      line-height: 1.45;
+    }
+
+    .choice-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .choice-btn {
+      min-height: 44px;
+      padding: 8px 6px;
+      border-radius: 16px;
+      background: var(--surface-muted);
+      border: 1.5px solid transparent;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-muted);
+      transition: all 0.16s ease;
+    }
+
+    .choice-btn.active {
+      background: var(--grad-soft);
+      border-color: var(--pink);
+      color: var(--pink);
+    }
+
+    .btn-grad-pill {
+      width: 100%;
+      min-height: 52px;
+      border-radius: 999px;
+      background: var(--grad);
+      color: #fff;
+      font-size: 15.5px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 12px 26px rgba(255, 45, 122, 0.28);
+      transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+
+    .btn-grad-pill:active {
+      transform: scale(0.97);
+    }
+
+    .btn-grad-pill:disabled {
+      opacity: 0.65;
+    }
+
+    .inline-alert {
+      background: #fff1f2;
+      border: 1px solid #fecdd3;
+      color: #be123c;
+      padding: 10px 14px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      line-height: 1.45;
+    }
+
+    /* ===========================
+       6. MAIN APP HEADER & TABS
+       =========================== */
+    .main-app {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+    }
+
+    .top-bar {
+      height: calc(56px + env(safe-area-inset-top));
+      padding: env(safe-area-inset-top) 16px 0;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      z-index: 20;
+    }
+
+    .top-brand {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+
+    .top-logo-mini {
+      width: 34px;
+      height: 34px;
+      border-radius: 11px;
+      background: var(--grad);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(255, 45, 122, 0.25);
+    }
+
+    .top-title {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      background: var(--grad);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .icon-btn-44 {
+      min-width: 44px;
+      min-height: 44px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text);
+      transition: background 0.15s;
+    }
+
+    .icon-btn-44:active {
+      background: var(--surface-muted);
+    }
+
+    .tab-viewport {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    .tab-pane {
+      min-height: 100%;
+      display: none;
+    }
+
+    .tab-pane.active {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .bottom-nav {
+      height: calc(64px + env(safe-area-inset-bottom));
+      padding-bottom: env(safe-area-inset-bottom);
+      background: rgba(255, 255, 255, 0.96);
+      backdrop-filter: blur(12px);
+      border-top: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      flex-shrink: 0;
+      z-index: 30;
+    }
+
+    .nav-tab {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      color: #8c8299;
+      font-size: 11px;
+      font-weight: 700;
+      transition: color 0.16s ease, transform 0.12s ease;
+    }
+
+    .nav-tab.active {
+      color: var(--pink);
+    }
+
+    .nav-tab:active {
+      transform: scale(0.93);
+    }
+
+    .nav-badge {
+      position: absolute;
+      top: 7px;
+      right: calc(50% - 20px);
+      min-width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      background: var(--pink);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 800;
+      padding: 0 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid #fff;
+    }
+
+    /* ===========================
+       7. HOME TAB (SWIPE STACK)
+       =========================== */
+    .home-wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 12px 14px 14px;
+      gap: 12px;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    .deck-area {
+      position: relative;
+      flex: 1;
+      min-height: 360px;
+      width: 100%;
+    }
+
+    .swipe-card {
+      position: absolute;
+      inset: 0;
+      border-radius: var(--radius-lg);
+      background: #1a1423;
+      overflow: hidden;
+      box-shadow: var(--shadow-lg);
+      user-select: none;
+      touch-action: none;
+      will-change: transform;
+      cursor: grab;
+    }
+
+    .swipe-card.is-back {
+      transform: scale(0.95) translateY(10px);
+      opacity: 0.72;
+      pointer-events: none;
+      transition: transform 0.25s ease, opacity 0.25s ease;
+    }
+
+    .swipe-card.animating {
+      transition: transform 0.34s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+    }
+
+    .card-photo {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      pointer-events: none;
+    }
+
+    .photo-bars {
+      position: absolute;
+      top: 10px;
+      left: 12px;
+      right: 12px;
+      display: flex;
+      gap: 5px;
+      z-index: 4;
+      pointer-events: none;
+    }
+
+    .photo-bar {
+      flex: 1;
+      height: 3.5px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.36);
+    }
+
+    .photo-bar.active {
+      background: #ffffff;
+    }
+
+    .tap-zones {
+      position: absolute;
+      inset: 0 0 140px 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      z-index: 3;
+    }
+
+    .card-scrim {
+      position: absolute;
+      inset: auto 0 0 0;
+      height: 55%;
+      background: linear-gradient(to top, rgba(16, 10, 24, 0.92) 0%, rgba(16, 10, 24, 0.5) 55%, transparent 100%);
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .card-info {
+      position: absolute;
+      left: 18px;
+      right: 18px;
+      bottom: 18px;
+      z-index: 4;
+      color: #fff;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .card-name-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      flex-wrap: wrap;
+    }
+
+    .card-name {
+      font-size: 26px;
+      font-weight: 800;
+      line-height: 1.15;
+      margin: 0;
+    }
+
+    .card-age {
+      font-size: 22px;
+      font-weight: 500;
+      opacity: 0.92;
+    }
+
+    .verified-tick {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #3b82f6;
+      color: #fff;
+      flex-shrink: 0;
+    }
+
+    .card-meta {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.85);
+      margin-top: 4px;
+      font-weight: 500;
+    }
+
+    .card-bio-preview {
+      font-size: 13.5px;
+      color: rgba(255, 255, 255, 0.92);
+      margin-top: 6px;
+      line-height: 1.4;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .card-info-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.22);
+      backdrop-filter: blur(8px);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+    }
+
+    /* Swipe stamps */
+    .swipe-stamp {
+      position: absolute;
+      top: 34px;
+      padding: 6px 16px;
+      border-radius: 14px;
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      border: 4px solid;
+      z-index: 6;
+      opacity: 0;
+      pointer-events: none;
+      background: rgba(255, 255, 255, 0.14);
+      backdrop-filter: blur(4px);
+    }
+
+    .stamp-like {
+      left: 20px;
+      color: #22c55e;
+      border-color: #22c55e;
+      transform: rotate(-14deg);
+    }
+
+    .stamp-pass {
+      right: 20px;
+      color: #fb7185;
+      border-color: #fb7185;
+      transform: rotate(14deg);
+    }
+
+    .stamp-super {
+      left: 50%;
+      top: auto;
+      bottom: 130px;
+      transform: translateX(-50%);
+      color: #38bdf8;
+      border-color: #38bdf8;
+    }
+
+    /* Action buttons under card deck */
+    .deck-controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      padding: 2px 0 4px;
+      flex-shrink: 0;
+    }
+
+    .circle-action {
+      border-radius: 50%;
+      background: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 10px 26px rgba(28, 22, 37, 0.12);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .circle-action:active {
+      transform: scale(0.9);
+    }
+
+    .act-pass { width: 60px; height: 60px; color: var(--red); font-size: 24px; }
+    .act-super { width: 52px; height: 52px; color: var(--blue); font-size: 22px; }
+    .act-like { width: 64px; height: 64px; color: #fff; background: var(--grad); font-size: 26px; box-shadow: 0 12px 26px rgba(255, 45, 122, 0.34); }
+
+    /* ===========================
+       8. EXPLORE / SEARCH TAB
+       =========================== */
+    .section-pad {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .card-box {
+      background: var(--surface);
+      border-radius: var(--radius-card);
+      padding: 16px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .section-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .section-title {
+      font-size: 16px;
+      font-weight: 800;
+      margin: 0;
+      color: var(--text);
+    }
+
+    .section-sub {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .h-strip {
+      display: flex;
+      gap: 12px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      scrollbar-width: none;
+    }
+    .h-strip::-webkit-scrollbar { display: none; }
+
+    .online-item {
+      width: 72px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      text-align: center;
+    }
+
+    .online-avatar-ring {
+      position: relative;
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      padding: 2.5px;
+      background: var(--grad);
+    }
+
+    .online-avatar-ring img {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid #fff;
+    }
+
+    .online-dot {
+      position: absolute;
+      bottom: 2px;
+      right: 2px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #22c55e;
+      border: 2.5px solid #fff;
+    }
+
+    .online-name {
+      font-size: 12px;
+      font-weight: 700;
+      max-width: 72px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .profile-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .mini-profile-card {
+      position: relative;
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      background: #1a1423;
+      aspect-ratio: 3 / 4;
+      box-shadow: var(--shadow-sm);
+      text-align: left;
+    }
+
+    .mini-profile-card img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .mini-card-scrim {
+      position: absolute;
+      inset: auto 0 0 0;
+      height: 54%;
+      background: linear-gradient(to top, rgba(16, 10, 24, 0.88), transparent);
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 10px 11px;
+      color: #fff;
+    }
+
+    .mini-card-name {
+      font-size: 14.5px;
+      font-weight: 800;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .mini-card-sub {
+      font-size: 11.5px;
+      color: rgba(255, 255, 255, 0.82);
+    }
+
+    .super-tag {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: rgba(37, 99, 235, 0.92);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 4px 8px;
+      border-radius: 999px;
+    }
+
+    .range-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    /* ===========================
+       9. MESSAGES & CHAT
+       =========================== */
+    .match-bubble-item {
+      width: 74px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .match-bubble-item img {
+      width: 66px;
+      height: 66px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2.5px solid var(--pink);
+      padding: 2px;
+      background: #fff;
+    }
+
+    .chat-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .chat-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      border-radius: var(--radius-md);
+      background: var(--surface);
+      box-shadow: var(--shadow-sm);
+      width: 100%;
+      text-align: left;
+      transition: transform 0.12s ease;
+    }
+
+    .chat-row:active {
+      transform: scale(0.985);
+    }
+
+    .chat-avatar-wrap {
+      position: relative;
+      width: 54px;
+      height: 54px;
+      flex-shrink: 0;
+    }
+
+    .chat-avatar-wrap img {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .chat-row-body {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .chat-row-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .chat-row-name {
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .chat-row-time {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    .chat-row-msg {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 3px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Full-screen Chat Room Overlay */
+    .chat-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 60;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chat-header {
+      height: calc(62px + env(safe-area-inset-top));
+      padding: env(safe-area-inset-top) 10px 0;
+      background: #ffffff;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .chat-peer-btn {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-align: left;
+      padding: 4px;
+    }
+
+    .chat-peer-btn img {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+
+    .chat-peer-name {
+      font-size: 15px;
+      font-weight: 800;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .chat-peer-status {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .msg-row {
+      display: flex;
+      flex-direction: column;
+      max-width: 78%;
+    }
+
+    .msg-row.me {
+      align-self: flex-end;
+      align-items: flex-end;
+    }
+
+    .msg-row.them {
+      align-self: flex-start;
+      align-items: flex-start;
+    }
+
+    .msg-bubble {
+      padding: 10px 14px;
+      border-radius: 20px;
+      font-size: 14.5px;
+      line-height: 1.42;
+      word-break: break-word;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+
+    .msg-row.me .msg-bubble {
+      background: var(--grad);
+      color: #ffffff;
+      border-bottom-right-radius: 6px;
+    }
+
+    .msg-row.them .msg-bubble {
+      background: #ffffff;
+      color: var(--text);
+      border-bottom-left-radius: 6px;
+    }
+
+    .msg-img {
+      max-width: 220px;
+      border-radius: 16px;
+      margin-bottom: 2px;
+    }
+
+    .msg-meta {
+      font-size: 10.5px;
+      color: var(--text-muted);
+      margin-top: 3px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .tick-read {
+      color: var(--pink);
+      font-weight: 800;
+    }
+
+    .chat-composer {
+      padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+      background: #ffffff;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .chat-input {
+      flex: 1;
+      height: 44px;
+      border-radius: 999px;
+      border: 1.5px solid var(--border);
+      background: var(--surface-muted);
+      padding: 0 16px;
+      font-size: 14.5px;
+      color: var(--text);
+    }
+
+    .send-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: var(--grad);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 6px 16px rgba(255, 45, 122, 0.28);
+    }
+
+    /* ===========================
+       10. PROFILE & ADMIN
+       =========================== */
+    .profile-hero-card {
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      padding: 22px 16px;
+      text-align: center;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .my-big-avatar {
+      width: 108px;
+      height: 108px;
+      border-radius: 50%;
+      object-fit: cover;
+      margin: 0 auto 12px;
+      border: 4px solid #fff;
+      box-shadow: 0 8px 24px rgba(255, 45, 122, 0.25);
+    }
+
+    .photos-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .photo-slot {
+      position: relative;
+      aspect-ratio: 3 / 4;
+      border-radius: 18px;
+      overflow: hidden;
+      background: var(--surface-muted);
+      border: 1.5px dashed rgba(142, 45, 226, 0.28);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--pink);
+    }
+
+    .photo-slot img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .photo-slot-actions {
+      position: absolute;
+      bottom: 6px;
+      right: 6px;
+      display: flex;
+      gap: 4px;
+    }
+
+    .photo-mini-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.68);
+      color: #fff;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .list-menu-btn {
+      width: 100%;
+      min-height: 52px;
+      padding: 12px 14px;
+      border-radius: 18px;
+      background: var(--surface);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 14.5px;
+      font-weight: 700;
+      color: var(--text);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .list-menu-btn.danger {
+      color: var(--red);
+    }
+
+    /* ===========================
+       11. MODALS, MATCH & CALL UI
+       =========================== */
+    .modal-backdrop {
+      position: absolute;
+      inset: 0;
+      z-index: 80;
+      background: rgba(16, 10, 24, 0.56);
+      backdrop-filter: blur(5px);
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+    }
+
+    .modal-backdrop.centered {
+      align-items: center;
+      padding: 18px;
+    }
+
+    .modal-sheet {
+      width: 100%;
+      max-height: 88dvh;
+      background: #ffffff;
+      border-radius: 28px 28px 0 0;
+      padding: 14px 18px calc(22px + env(safe-area-inset-bottom));
+      overflow-y: auto;
+      animation: slideUp 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .modal-dialog {
+      width: 100%;
+      max-width: 380px;
+      max-height: 86dvh;
+      background: #ffffff;
+      border-radius: 26px;
+      padding: 20px 18px;
+      overflow-y: auto;
+      box-shadow: var(--shadow-lg);
+      animation: toastIn 0.2s ease;
+    }
+
+    .sheet-handle {
+      width: 42px;
+      height: 5px;
+      border-radius: 999px;
+      background: #d8d0e0;
+      margin: 0 auto 14px;
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(40px); opacity: 0.7; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    /* Full-screen It's a Match! Overlay */
+    .match-celebration {
+      position: absolute;
+      inset: 0;
+      z-index: 95;
+      background: linear-gradient(155deg, rgba(142, 45, 226, 0.96), rgba(255, 45, 122, 0.96), rgba(255, 122, 89, 0.96));
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 28px 22px;
+      color: #fff;
+      animation: toastIn 0.28s ease;
+    }
+
+    .match-photos-pair {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 22px 0;
+    }
+
+    .match-photos-pair img {
+      width: 112px;
+      height: 112px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 4px solid #fff;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+    }
+
+    .match-photos-pair img:first-child {
+      transform: rotate(-7deg) translateX(10px);
+    }
+
+    .match-photos-pair img:last-child {
+      transform: rotate(7deg) translateX(-10px);
+    }
+
+    /* Audio/Video Call Overlay */
+    .call-screen {
+      position: absolute;
+      inset: 0;
+      z-index: 100;
+      background: linear-gradient(160deg, #1b112c, #311245, #1b112c);
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: calc(28px + env(safe-area-inset-top)) 20px calc(32px + env(safe-area-inset-bottom));
+    }
+
+    .call-video-stage {
+      position: relative;
+      flex: 1;
+      border-radius: 26px;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.08);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin: 14px 0;
+    }
+
+    .remote-video {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .local-video {
+      position: absolute;
+      bottom: 14px;
+      right: 14px;
+      width: 96px;
+      height: 132px;
+      border-radius: 16px;
+      object-fit: cover;
+      border: 2px solid #fff;
+      background: #000;
+      z-index: 4;
+    }
+
+    .call-controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+    }
+
+    .call-btn {
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.18);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .call-btn.end {
+      background: #e11d48;
+      width: 64px;
+      height: 64px;
+    }
+
+    /* Empty & Loading States */
+    .empty-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 36px 24px;
+      color: var(--text-muted);
+      gap: 10px;
+    }
+
+    .empty-icon-circle {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: var(--grad-soft);
+      color: var(--pink);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      margin-bottom: 4px;
+    }
+
+    .admin-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .small-pill-btn {
+      min-height: 36px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      background: var(--surface-muted);
+      color: var(--text);
+    }
+
+    .small-pill-btn.pink { background: var(--grad); color: #fff; }
+    .small-pill-btn.red { background: #ffe4e6; color: #be123c; }
+    .small-pill-btn.green { background: #dcfce7; color: #15803d; }
+  </style>
+</head>
+<body>
+  <div class="shell-outer">
+    <div class="app-frame" id="appFrame">
+      <!-- Global Toast Notifications -->
+      <div class="toast-container" id="toastContainer"></div>
+
+      <!-- Global Splash Loader -->
+      <div class="splash-screen" id="splashScreen">
+        <div class="logo-tile">
+          <svg width="46" height="46" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="heartGradSplash" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#8e2de2"/>
+                <stop offset="55%" stop-color="#ff2d7a"/>
+                <stop offset="100%" stop-color="#ff7a59"/>
+              </linearGradient>
+            </defs>
+            <path d="M24 42.5C24 42.5 5 30.8 5 16.8C5 10.6 9.8 6 15.6 6C19.2 6 22.3 7.8 24 10.6C25.7 7.8 28.8 6 32.4 6C38.2 6 43 10.6 43 16.8C43 30.8 24 42.5 24 42.5Z" fill="url(#heartGradSplash)"/>
+            <circle cx="17" cy="21" r="2.5" fill="#fff"/>
+            <circle cx="24" cy="21" r="2.5" fill="#fff"/>
+            <circle cx="31" cy="21" r="2.5" fill="#fff"/>
+          </svg>
+        </div>
+        <div style="font-size:26px;font-weight:800;">MeetUp</div>
+        <div class="spinner"></div>
+        <div style="font-size:13.5px;font-weight:600;opacity:0.9;">लोड हो रहा है...</div>
+      </div>
+
+      <!-- ===========================
+           SCREEN 1: LOGIN / SIGNUP
+           =========================== -->
+      <section class="login-screen hidden" id="loginScreen">
+        <!-- Rising animated hearts -->
+        <div class="hearts-layer" id="heartsLayer" aria-hidden="true"></div>
+
+        <!-- 4 bobbing profile bubbles with emoji faces -->
+        <div class="bob-bubble bob-1" aria-hidden="true">😍</div>
+        <div class="bob-bubble bob-2" aria-hidden="true">🥰</div>
+        <div class="bob-bubble bob-3" aria-hidden="true">😎</div>
+        <div class="bob-bubble bob-4" aria-hidden="true">🌸</div>
+
+        <div class="login-hero">
+          <div class="logo-tile">
+            <!-- Gradient heart with 3 chat dots inside -->
+            <svg width="48" height="48" viewBox="0 0 48 48" fill="none" aria-label="MeetUp लोगो">
+              <defs>
+                <linearGradient id="heartGradLogin" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stop-color="#8e2de2"/>
+                  <stop offset="52%" stop-color="#ff2d7a"/>
+                  <stop offset="100%" stop-color="#ff7a59"/>
+                </linearGradient>
+              </defs>
+              <path d="M24 42.5C24 42.5 5 30.8 5 16.8C5 10.6 9.8 6 15.6 6C19.2 6 22.3 7.8 24 10.6C25.7 7.8 28.8 6 32.4 6C38.2 6 43 10.6 43 16.8C43 30.8 24 42.5 24 42.5Z" fill="url(#heartGradLogin)"/>
+              <circle cx="16.8" cy="21" r="2.6" fill="#ffffff"/>
+              <circle cx="24" cy="21" r="2.6" fill="#ffffff"/>
+              <circle cx="31.2" cy="21" r="2.6" fill="#ffffff"/>
+            </svg>
+          </div>
+          <h1 class="login-brand">MeetUp</h1>
+          <p class="login-tagline">अपना मैच ढूंढो 💕</p>
+          <p class="login-sub">सिंगल्स के लिए भारत का आधुनिक डेटिंग ऐप — स्वाइप करें, मैच पाएं और दिल की बात करें</p>
+        </div>
+
+        <form class="login-form-box" id="authForm" novalidate>
+          <div class="auth-error-box hidden" id="authErrorBox"></div>
+
+          <div class="glass-input-wrap">
+            <input type="email" id="authEmail" class="glass-input" placeholder="ईमेल पता लिखें" autocomplete="email" required />
+          </div>
+
+          <div class="glass-input-wrap">
+            <input type="password" id="authPassword" class="glass-input" placeholder="पासवर्ड लिखें" autocomplete="current-password" style="padding-right:52px;" required />
+            <button type="button" class="pw-toggle" id="togglePwBtn" aria-label="पासवर्ड दिखाएं या छिपाएं">👁️</button>
+          </div>
+
+          <button type="submit" class="btn-white-pill" id="authSubmitBtn">लॉगिन करो</button>
+
+          <div class="or-divider">या</div>
+
+          <button type="button" class="btn-google-pill" id="googleLoginBtn">
+            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="#EA4335" d="M12 10.2v3.9h5.4c-.2 1.2-1.5 3.6-5.4 3.6-3.2 0-5.9-2.7-5.9-6s2.7-6 5.9-6c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.7 3.1 14.6 2 12 2 6.5 2 2 6.5 2 12s4.5 10 10 10c5.8 0 9.6-4.1 9.6-9.8 0-.7-.1-1.2-.2-1.7H12z"/>
+              <path fill="#34A853" d="M3.2 7.3l3.2 2.3C7.3 7.7 9.5 6 12 6c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.7 3.1 14.6 2 12 2 8.1 2 4.8 4.2 3.2 7.3z"/>
+              <path fill="#FBBC05" d="M12 22c2.5 0 4.7-.8 6.3-2.3l-2.9-2.4c-.8.6-1.9 1-3.4 1-2.6 0-4.8-1.7-5.6-4.1l-3.2 2.5C4.8 19.8 8.1 22 12 22z"/>
+              <path fill="#4285F4" d="M21.6 12.2c0-.7-.1-1.2-.2-1.7H12v3.9h5.4c-.3 1.4-1.1 2.4-2 3.1l2.9 2.4c1.7-1.6 3.3-4 3.3-7.7z"/>
+            </svg>
+            <span>Google से जारी रखो</span>
+          </button>
+
+          <button type="button" class="auth-toggle-btn" id="toggleAuthModeBtn">नए हो? साइन-अप करो</button>
+          <div class="age-note">18 साल या उससे ज़्यादा उम्र वालों के लिए</div>
+        </form>
+      </section>
+
+      <!-- ===========================
+           SCREEN 2: PROFILE SETUP
+           =========================== -->
+      <section class="setup-screen hidden" id="setupScreen">
+        <div class="setup-card">
+          <div class="setup-header">
+            <h2>अपनी प्रोफ़ाइल बनाएं</h2>
+            <p>मैच पाने के लिए अपनी सही जानकारी भरें</p>
+          </div>
+
+          <div class="inline-alert hidden" id="setupErrorBox"></div>
+
+          <form id="setupForm">
+            <label class="avatar-picker" for="setupPhotoInput" aria-label="प्रोफ़ाइल फ़ोटो चुनें">
+              <img id="setupPhotoPreview" class="hidden" alt="प्रोफ़ाइल प्रीव्यू" />
+              <div id="setupPhotoPlaceholder" style="text-align:center;color:var(--pink);font-size:12px;font-weight:700;padding:10px;">
+                <div style="font-size:28px;">📷</div>
+                फ़ोटो चुनें
+              </div>
+              <div class="avatar-picker-badge">＋</div>
+              <input type="file" id="setupPhotoInput" accept="image/*" class="hidden" />
+            </label>
+
+            <div class="field-group">
+              <label class="field-label" for="setupName">आपका नाम</label>
+              <input type="text" id="setupName" class="field-input" placeholder="जैसे: आरव शर्मा" maxlength="40" required />
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="setupDob">जन्म तिथि (18+ अनिवार्य)</label>
+              <input type="date" id="setupDob" class="field-input" required />
+            </div>
+
+            <div class="field-group">
+              <div class="field-label">आपका लिंग</div>
+              <div class="choice-grid" id="setupGenderGrid">
+                <button type="button" class="choice-btn active" data-val="पुरुष">पुरुष</button>
+                <button type="button" class="choice-btn" data-val="महिला">महिला</button>
+                <button type="button" class="choice-btn" data-val="अन्य">अन्य</button>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <div class="field-label">किसमें दिलचस्पी है?</div>
+              <div class="choice-grid" id="setupInterestGrid">
+                <button type="button" class="choice-btn active" data-val="महिलाओं से">महिलाओं से</button>
+                <button type="button" class="choice-btn" data-val="पुरुषों से">पुरुषों से</button>
+                <button type="button" class="choice-btn" data-val="सबसे">सबसे</button>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="setupCity">शहर / स्थान</label>
+              <input type="text" id="setupCity" class="field-input" placeholder="जैसे: दिल्ली, मुंबई, जयपुर" maxlength="40" />
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="setupBio">
+                <span>अपने बारे में (बायो)</span>
+                <span class="tabular" id="setupBioCount">0/200</span>
+              </label>
+              <textarea id="setupBio" class="field-textarea" maxlength="200" placeholder="अपनी पसंद, शौक या कुछ खास लिखें..."></textarea>
+            </div>
+
+            <button type="submit" class="btn-grad-pill" id="setupSubmitBtn">प्रोफ़ाइल सेव करें और आगे बढ़ें</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- ===========================
+           SCREEN 3: BANNED NOTICE
+           =========================== -->
+      <section class="setup-screen hidden" id="bannedScreen">
+        <div class="setup-card" style="text-align:center;margin-top:40px;">
+          <div style="font-size:48px;margin-bottom:10px;">🚫</div>
+          <h2 style="margin:0 0 8px;color:var(--red);">अकाउंट प्रतिबंधित है</h2>
+          <p style="font-size:14px;color:var(--text-muted);line-height:1.5;margin-bottom:20px;">
+            नियमों के उल्लंघन के कारण आपका MeetUp अकाउंट बंद कर दिया गया है।
+          </p>
+          <button type="button" class="btn-grad-pill" id="bannedLogoutBtn">लॉगआउट करें</button>
+        </div>
+      </section>
+
+      <!-- ===========================
+           SCREEN 4: MAIN APP (4 TABS)
+           =========================== -->
+      <section class="main-app hidden" id="mainApp">
+        <!-- Sticky Top Bar -->
+        <header class="top-bar">
+          <div class="top-brand">
+            <div class="top-logo-mini">
+              <svg width="20" height="20" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+                <path d="M24 42.5C24 42.5 5 30.8 5 16.8C5 10.6 9.8 6 15.6 6C19.2 6 22.3 7.8 24 10.6C25.7 7.8 28.8 6 32.4 6C38.2 6 43 10.6 43 16.8C43 30.8 24 42.5 24 42.5Z" fill="#ffffff"/>
+                <circle cx="17" cy="21" r="2.4" fill="#ff2d7a"/>
+                <circle cx="24" cy="21" r="2.4" fill="#ff2d7a"/>
+                <circle cx="31" cy="21" r="2.4" fill="#ff2d7a"/>
+              </svg>
+            </div>
+            <span class="top-title" id="topBarTitle">MeetUp</span>
+          </div>
+          <div class="top-actions">
+            <button type="button" class="icon-btn-44 hidden" id="adminHeaderBtn" title="एडमिन पैनल" aria-label="एडमिन पैनल">🛡️</button>
+            <button type="button" class="icon-btn-44" id="refreshDeckBtn" title="रिफ़्रेश करें" aria-label="रिफ़्रेश करें">🔄</button>
+          </div>
+        </header>
+
+        <!-- Tab Viewport -->
+        <main class="tab-viewport">
+          <!-- TAB 1: होम (SWIPE DECK) -->
+          <div class="tab-pane active" id="tab-home">
+            <div class="home-wrap">
+              <div class="deck-area" id="deckArea">
+                <div class="empty-state" id="deckLoading">
+                  <div class="spinner spinner-dark"></div>
+                  <div>आपके लिए प्रोफ़ाइल ढूंढे जा रहे हैं...</div>
+                </div>
+              </div>
+              <div class="deck-controls" id="deckControls">
+                <button type="button" class="circle-action act-pass" id="btnPass" aria-label="पास करें">✕</button>
+                <button type="button" class="circle-action act-super" id="btnSuper" aria-label="सुपर लाइक">★</button>
+                <button type="button" class="circle-action act-like" id="btnLike" aria-label="लाइक करें">♥</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 2: सर्च / एक्सप्लोर -->
+          <div class="tab-pane" id="tab-explore">
+            <div class="section-pad">
+              <!-- Online Now Strip -->
+              <div class="card-box">
+                <div class="section-title-row">
+                  <h3 class="section-title">ऑनलाइन अभी</h3>
+                  <span class="section-sub tabular" id="onlineCountLabel">0 सक्रिय</span>
+                </div>
+                <div class="h-strip" id="onlineStrip">
+                  <div class="section-sub">लोड हो रहा है...</div>
+                </div>
+              </div>
+
+              <!-- Who Liked You Section -->
+              <div class="card-box">
+                <div class="section-title-row">
+                  <h3 class="section-title">तुम्हें किसने लाइक किया ♥</h3>
+                  <span class="section-sub tabular" id="likedMeCount">0</span>
+                </div>
+                <div id="likedMeGrid" class="profile-grid"></div>
+                <div id="likedMeEmpty" class="section-sub hidden" style="text-align:center;padding:12px 0;">
+                  अभी कोई नया लाइक नहीं है — स्वाइप करना जारी रखें!
+                </div>
+              </div>
+
+              <!-- Filters Card -->
+              <div class="card-box">
+                <div class="section-title-row">
+                  <h3 class="section-title">फ़िल्टर चुनें</h3>
+                  <button type="button" class="small-pill-btn" id="resetFilterBtn">रीसेट</button>
+                </div>
+                <div class="range-row">
+                  <div class="field-group" style="margin-bottom:8px;">
+                    <label class="field-label" for="filterMinAge">न्यूनतम उम्र</label>
+                    <input type="number" id="filterMinAge" class="field-input" min="18" max="80" value="18" />
+                  </div>
+                  <div class="field-group" style="margin-bottom:8px;">
+                    <label class="field-label" for="filterMaxAge">अधिकतम उम्र</label>
+                    <input type="number" id="filterMaxAge" class="field-input" min="18" max="80" value="45" />
+                  </div>
+                </div>
+                <div class="range-row">
+                  <div class="field-group" style="margin-bottom:8px;">
+                    <label class="field-label" for="filterGender">लिंग</label>
+                    <select id="filterGender" class="field-select">
+                      <option value="सभी">सभी</option>
+                      <option value="महिला">महिला</option>
+                      <option value="पुरुष">पुरुष</option>
+                      <option value="अन्य">अन्य</option>
+                    </select>
+                  </div>
+                  <div class="field-group" style="margin-bottom:8px;">
+                    <label class="field-label" for="filterDistance">दूरी (किमी)</label>
+                    <select id="filterDistance" class="field-select">
+                      <option value="0">कोई सीमा नहीं</option>
+                      <option value="10">10 किमी तक</option>
+                      <option value="25">25 किमी तक</option>
+                      <option value="50">50 किमी तक</option>
+                      <option value="100">100 किमी तक</option>
+                    </select>
+                  </div>
+                </div>
+                <button type="button" class="btn-grad-pill" id="applyFilterBtn" style="min-height:46px;">फ़िल्टर लागू करें</button>
+              </div>
+
+              <!-- Filtered Explore Grid -->
+              <div>
+                <div class="section-title-row" style="padding:0 4px;">
+                  <h3 class="section-title">प्रोफ़ाइल एक्सप्लोर करें</h3>
+                  <span class="section-sub tabular" id="exploreResultCount">0</span>
+                </div>
+                <div class="profile-grid" id="exploreGrid"></div>
+                <div class="empty-state hidden" id="exploreEmpty">
+                  <div class="empty-icon-circle">🔍</div>
+                  <div>इस फ़िल्टर से कोई प्रोफ़ाइल नहीं मिली।</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 3: मैसेज (MATCHES & CHATS) -->
+          <div class="tab-pane" id="tab-messages">
+            <div class="section-pad">
+              <div class="card-box">
+                <div class="section-title-row">
+                  <h3 class="section-title">नए मैच ✨</h3>
+                  <span class="section-sub tabular" id="matchesCountLabel">0</span>
+                </div>
+                <div class="h-strip" id="newMatchesStrip"></div>
+                <div id="noNewMatches" class="section-sub hidden" style="padding:6px 0;">
+                  जब दो लोग एक-दूसरे को लाइक करेंगे, तो मैच यहाँ दिखेंगे।
+                </div>
+              </div>
+
+              <div>
+                <div class="section-title-row" style="padding:0 4px;">
+                  <h3 class="section-title">चैट लिस्ट</h3>
+                </div>
+                <div class="chat-list" id="chatList"></div>
+                <div class="empty-state hidden" id="chatListEmpty">
+                  <div class="empty-icon-circle">💬</div>
+                  <div style="font-weight:700;color:var(--text);">अभी कोई बातचीत नहीं है</div>
+                  <div>होम टैब पर स्वाइप करें और नए लोगों से जुड़ें!</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 4: प्रोफ़ाइल -->
+          <div class="tab-pane" id="tab-profile">
+            <div class="section-pad">
+              <div class="profile-hero-card">
+                <img id="myProfileAvatar" class="my-big-avatar" alt="मेरी फ़ोटो" />
+                <div style="display:flex;align-items:center;justify-content:center;gap:6px;">
+                  <h2 id="myProfileName" style="margin:0;font-size:21px;font-weight:800;">-</h2>
+                  <span id="myVerifiedBadge" class="verified-tick hidden" title="सत्यापित प्रोफ़ाइल">✓</span>
+                </div>
+                <div id="myProfileSub" style="font-size:13.5px;color:var(--text-muted);margin-top:4px;">-</div>
+                <p id="myProfileBio" style="font-size:13.5px;margin:10px auto 14px;max-width:300px;line-height:1.45;"></p>
+                <div style="display:flex;gap:10px;">
+                  <button type="button" class="btn-grad-pill" id="openEditProfileBtn" style="min-height:46px;font-size:14px;">प्रोफ़ाइल एडिट करें</button>
+                </div>
+              </div>
+
+              <!-- Photo Verification Card -->
+              <div class="card-box">
+                <div class="section-title-row">
+                  <h3 class="section-title">फ़ोटो वेरिफ़िकेशन</h3>
+                  <span class="section-sub" id="verifyStatusText">असत्यापित</span>
+                </div>
+                <p style="font-size:12.5px;color:var(--text-muted);margin:0 0 12px;line-height:1.45;">
+                  वेरिफ़ाइड ब्लू बैज पाने के लिए अपनी एक स्पष्ट सेल्फ़ी अपलोड करें।
+                </p>
+                <label class="small-pill-btn pink" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
+                  <span>📸 सेल्फ़ी से वेरिफ़ाई करें</span>
+                  <input type="file" id="verifySelfieInput" accept="image/*" capture="user" class="hidden" />
+                </label>
+              </div>
+
+              <!-- Multiple Photos Manager -->
+              <div class="card-box">
+                <div class="section-title-row">
+                  <h3 class="section-title">मेरी फ़ोटो (अधिकतम 6)</h3>
+                  <span class="section-sub tabular" id="myPhotoCount">0/6</span>
+                </div>
+                <div class="photos-grid" id="myPhotosGrid"></div>
+                <input type="file" id="addExtraPhotoInput" accept="image/*" class="hidden" />
+              </div>
+
+              <!-- Settings & Actions -->
+              <div style="display:flex;flex-direction:column;gap:10px;">
+                <button type="button" class="list-menu-btn" id="openSettingsBtn">
+                  <span>⚙️ सेटिंग्स और ब्लॉक लिस्ट</span>
+                  <span>›</span>
+                </button>
+                <button type="button" class="list-menu-btn hidden" id="openAdminBtn">
+                  <span>🛡️ एडमिन पैनल (Users & Reports)</span>
+                  <span>›</span>
+                </button>
+                <button type="button" class="list-menu-btn" id="logoutBtn">
+                  <span>🚪 लॉगआउट करें</span>
+                  <span>›</span>
+                </button>
+                <button type="button" class="list-menu-btn danger" id="deleteAccountBtn">
+                  <span>🗑️ अकाउंट हमेशा के लिए डिलीट करें</span>
+                  <span>›</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </main>
+
+        <!-- Bottom Navigation Bar (4 Tabs) -->
+        <nav class="bottom-nav" aria-label="मुख्य नेविगेशन">
+          <button type="button" class="nav-tab active" data-tab="home">
+            <svg width="23" height="23" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+            </svg>
+            <span>होम</span>
+          </button>
+          <button type="button" class="nav-tab" data-tab="explore">
+            <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+              <circle cx="11" cy="11" r="7"/>
+              <path d="M21 21l-4.35-4.35" stroke-linecap="round"/>
+            </svg>
+            <span>सर्च</span>
+          </button>
+          <button type="button" class="nav-tab" data-tab="messages">
+            <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" stroke-linejoin="round"/>
+            </svg>
+            <span>मैसेज</span>
+            <span class="nav-badge hidden" id="unreadBadge">0</span>
+          </button>
+          <button type="button" class="nav-tab" data-tab="profile">
+            <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+              <circle cx="12" cy="8" r="4"/>
+              <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke-linecap="round"/>
+            </svg>
+            <span>प्रोफ़ाइल</span>
+          </button>
+        </nav>
+      </section>
+
+      <!-- ===========================
+           CHAT ROOM OVERLAY
+           =========================== -->
+      <section class="chat-overlay hidden" id="chatOverlay">
+        <header class="chat-header">
+          <button type="button" class="icon-btn-44" id="chatBackBtn" aria-label="वापस जाएं">←</button>
+          <button type="button" class="chat-peer-btn" id="chatPeerHeaderBtn">
+            <img id="chatPeerAvatar" alt="चैट पार्टनर" />
+            <div style="min-width:0;">
+              <div class="chat-peer-name" id="chatPeerName">-</div>
+              <div class="chat-peer-status" id="chatPeerStatus">ऑफ़लाइन</div>
+            </div>
+          </button>
+          <button type="button" class="icon-btn-44" id="audioCallBtn" title="ऑडियो कॉल" aria-label="ऑडियो कॉल">📞</button>
+          <button type="button" class="icon-btn-44" id="videoCallBtn" title="वीडियो कॉल" aria-label="वीडियो कॉल">📹</button>
+          <button type="button" class="icon-btn-44" id="chatMenuBtn" title="विकल्प" aria-label="चैट विकल्प">⋮</button>
+        </header>
+
+        <div class="chat-messages" id="chatMessages"></div>
+
+        <form class="chat-composer" id="chatForm">
+          <label class="icon-btn-44" style="cursor:pointer;color:var(--purple);" title="फ़ोटो भेजें" aria-label="फ़ोटो भेजें">
+            📷
+            <input type="file" id="chatPhotoInput" accept="image/*" class="hidden" />
+          </label>
+          <input type="text" id="chatInput" class="chat-input" placeholder="मैसेज लिखें..." autocomplete="off" />
+          <button type="submit" class="send-btn" aria-label="भेजें">➤</button>
+        </form>
+      </section>
+
+      <!-- ===========================
+           IT'S A MATCH CELEBRATION
+           =========================== -->
+      <section class="match-celebration hidden" id="matchOverlay">
+        <div style="font-size:34px;font-weight:800;letter-spacing:-0.02em;">It's a Match! 💕</div>
+        <p style="font-size:15px;margin:8px 0 0;opacity:0.95;" id="matchSubtitle">आप दोनों ने एक-दूसरे को पसंद किया!</p>
+        <div class="match-photos-pair">
+          <img id="matchMyPhoto" alt="मेरी फ़ोटो" />
+          <img id="matchPeerPhoto" alt="मैच फ़ोटो" />
+        </div>
+        <div style="width:100%;max-width:300px;display:flex;flex-direction:column;gap:12px;">
+          <button type="button" class="btn-white-pill" id="matchSendMsgBtn">मैसेज भेजो 💬</button>
+          <button type="button" class="auth-toggle-btn" id="matchKeepSwipingBtn" style="text-decoration:none;">स्वाइप जारी रखें</button>
+        </div>
+      </section>
+
+      <!-- ===========================
+           AUDIO / VIDEO CALL OVERLAY
+           =========================== -->
+      <section class="call-screen hidden" id="callOverlay">
+        <div style="text-align:center;">
+          <div style="font-size:13px;opacity:0.8;font-weight:700;" id="callTypeLabel">वीडियो कॉल</div>
+          <h2 style="margin:4px 0 2px;font-size:24px;font-weight:800;" id="callPeerName">-</h2>
+          <div class="tabular" style="font-size:14px;opacity:0.88;" id="callStatusText">कनेक्ट हो रहा है...</div>
+        </div>
+
+        <div class="call-video-stage">
+          <video id="remoteVideo" class="remote-video hidden" autoplay playsinline></video>
+          <img id="callPeerAvatar" style="width:116px;height:116px;border-radius:50%;object-fit:cover;border:3px solid rgba(255,255,255,0.7);z-index:2;" alt="कॉल पार्टनर" />
+          <video id="localVideo" class="local-video hidden" autoplay playsinline muted></video>
+        </div>
+
+        <div class="call-controls" id="callActiveControls">
+          <button type="button" class="call-btn" id="toggleMicBtn" aria-label="माइक म्यूट">🎤</button>
+          <button type="button" class="call-btn" id="toggleCamBtn" aria-label="कैमरा बंद/चालू">📷</button>
+          <button type="button" class="call-btn end" id="endCallBtn" aria-label="कॉल काटें">📵</button>
+        </div>
+
+        <div class="call-controls hidden" id="callIncomingControls">
+          <button type="button" class="call-btn end" id="rejectCallBtn" aria-label="कॉल अस्वीकार करें">📵</button>
+          <button type="button" class="call-btn" id="acceptCallBtn" style="background:#16a34a;width:64px;height:64px;" aria-label="कॉल उठाएं">📞</button>
+        </div>
+      </section>
+
+      <!-- ===========================
+           SHARED MODAL CONTAINER
+           =========================== -->
+      <div class="modal-backdrop hidden" id="modalBackdrop">
+        <div class="modal-sheet" id="modalContainer"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===========================
+       FIREBASE & APP LOGIC
+       =========================== -->
+  <script type="module">
+    /* ----------------------------------------------------
+       1. ADMIN CONFIG & FIREBASE v10.12.2 MODULAR IMPORTS
+       ---------------------------------------------------- */
+    // Add admin email addresses here to show the Admin Panel in the app
+    const ADMIN_EMAILS = [
+      "admin@meetup.app",
+      "satpalsinghrawat640@gmail.com"
+    ];
+
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import {
+      initializeAuth,
+      indexedDBLocalPersistence,
+      browserLocalPersistence,
+      browserSessionPersistence,
+      browserPopupRedirectResolver,
+      getRedirectResult,
+      onAuthStateChanged,
+      signInWithEmailAndPassword,
+      createUserWithEmailAndPassword,
+      signInWithPopup,
+      signInWithRedirect,
+      GoogleAuthProvider,
+      signOut,
+      deleteUser
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import {
+      getFirestore,
+      doc,
+      getDoc,
+      setDoc,
+      updateDoc,
+      deleteDoc,
+      collection,
+      addDoc,
+      getDocs,
+      query,
+      where,
+      orderBy,
+      limit,
+      onSnapshot,
+      serverTimestamp,
+      arrayUnion
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCU8Vk4S1z_PgUPiEGEWaprMUNTMS2sxao",
+      authDomain: "meetup-find-your-partner.firebaseapp.com",
+      projectId: "meetup-find-your-partner",
+      storageBucket: "meetup-find-your-partner.firebasestorage.app",
+      messagingSenderId: "561251220717",
+      appId: "1:561251220717:web:221253e9f995699ea7a0e4"
+    };
+
+    // Initialize Firebase App
+    const app = initializeApp(firebaseConfig);
+
+    // Initialize Auth with persistence fallbacks for Android WebView compatibility
+    const auth = initializeAuth(app, {
+      persistence: [
+        indexedDBLocalPersistence,
+        browserLocalPersistence,
+        browserSessionPersistence
+      ],
+      popupRedirectResolver: browserPopupRedirectResolver
+    });
+
+    const db = getFirestore(app);
+    const googleProvider = new GoogleAuthProvider();
+
+    /* ----------------------------------------------------
+       2. GLOBAL STATE
+       ---------------------------------------------------- */
+    const state = {
+      user: null,
+      profile: null,
+      isSignupMode: false,
+      activeTab: "home",
+      setupGender: "पुरुष",
+      setupInterest: "महिलाओं से",
+      setupPhotoBase64: "",
+      allUsers: [],
+      myLikesMap: {},       // toUid -> 'like' | 'pass' | 'super'
+      likedMeList: [],      // array of { user, type }
+      blockedSet: new Set(),
+      blockedByMe: [],      // array of blocked uids
+      deck: [],
+      matches: [],          // array of { id, peer, data }
+      unreadCount: 0,
+      filters: {
+        minAge: 18,
+        maxAge: 45,
+        gender: "सभी",
+        maxDistance: 0
+      },
+      activeChatMatchId: null,
+      activeChatPeer: null,
+      chatUnsub: null,
+      matchesUnsub: null,
+      incomingCallUnsub: null,
+      presenceTimer: null,
+      lastMatchInfo: null
+    };
+
+    // WebRTC call state
+    const callState = {
+      pc: null,
+      localStream: null,
+      remoteStream: null,
+      matchId: null,
+      peer: null,
+      type: "video",
+      isCaller: false,
+      callDocUnsub: null,
+      timerInterval: null,
+      seconds: 0,
+      micEnabled: true,
+      camEnabled: true
+    };
+
+    /* ----------------------------------------------------
+       3. SECURITY & HELPER UTILITIES
+       ---------------------------------------------------- */
+    // Escape all user-provided strings to prevent XSS
+    function escapeHtml(value) {
+      if (value === null || value === undefined) return "";
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    // Validate image source before rendering
+    function safeAvatar(src, name = "U") {
+      if (typeof src === "string" && (src.startsWith("data:image/") || src.startsWith("https://"))) {
+        return src;
+      }
+      // Fallback inline SVG avatar with initial letter
+      const initial = escapeHtml((name || "M").trim().charAt(0).toUpperCase() || "M");
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#8e2de2"/><stop offset="55%" stop-color="#ff2d7a"/><stop offset="100%" stop-color="#ff7a59"/></linearGradient></defs><rect width="300" height="300" fill="url(#g)"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="#ffffff" font-family="sans-serif" font-size="112" font-weight="800">${initial}</text></svg>`;
+      return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+    }
+
+    // Show toast notification in Hindi
+    function showToast(message, type = "info") {
+      const container = document.getElementById("toastContainer");
+      const el = document.createElement("div");
+      el.className = `toast ${type}`;
+      el.textContent = message;
+      container.appendChild(el);
+      setTimeout(() => {
+        el.style.opacity = "0";
+        el.style.transform = "translateY(-8px)";
+        el.style.transition = "all 0.2s ease";
+        setTimeout(() => el.remove(), 220);
+      }, 3200);
+    }
+
+    // Resize uploaded image to max 640px JPEG (quality 0.72) base64
+    function resizeImageToBase64(file, maxSize = 640, quality = 0.72) {
+      return new Promise((resolve, reject) => {
+        if (!file || !file.type.startsWith("image/")) {
+          reject(new Error("कृपया एक मान्य फ़ोटो चुनें।"));
+          return;
+        }
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("फ़ोटो पढ़ने में समस्या आई।"));
+        reader.onload = () => {
+          const img = new Image();
+          img.onerror = () => reject(new Error("फ़ोटो लोड नहीं हो सकी।"));
+          img.onload = () => {
+            let width = img.width;
+            let height = img.height;
+            if (width > height && width > maxSize) {
+              height = Math.round((height * maxSize) / width);
+              width = maxSize;
+            } else if (height >= width && height > maxSize) {
+              width = Math.round((width * maxSize) / height);
+              height = maxSize;
+            }
+            const canvas = document.createElement("canvas");
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL("image/jpeg", quality);
+            resolve(dataUrl);
+          };
+          img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // Calculate exact age from YYYY-MM-DD string
+    function calculateAge(dobString) {
+      if (!dobString) return 0;
+      const dob = new Date(dobString);
+      if (isNaN(dob.getTime())) return 0;
+      const today = new Date();
+      let age = today.getFullYear() - dob.getFullYear();
+      const m = today.getMonth() - dob.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+        age--;
+      }
+      return age;
+    }
+
+    // Sort two UIDs consistently for match document ID
+    function getMatchId(uidA, uidB) {
+      return [uidA, uidB].sort().join("_");
+    }
+
+    // Approximate distance in km between two users if coordinates exist
+    function getDistanceKm(u1, u2) {
+      if (u1?.lat && u1?.lng && u2?.lat && u2?.lng) {
+        const R = 6371;
+        const dLat = ((u2.lat - u1.lat) * Math.PI) / 180;
+        const dLng = ((u2.lng - u1.lng) * Math.PI) / 180;
+        const a =
+          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos((u1.lat * Math.PI) / 180) *
+            Math.cos((u2.lat * Math.PI) / 180) *
+            Math.sin(dLng / 2) *
+            Math.sin(dLng / 2);
+        return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+      }
+      if (u1?.city && u2?.city && u1.city.trim().toLowerCase() === u2.city.trim().toLowerCase()) {
+        return 3;
+      }
+      return null;
+    }
+
+    // Check if user was active in the last 10 minutes
+    function isOnlineNow(userObj) {
+      if (!userObj?.lastActive) return false;
+      return Date.now() - Number(userObj.lastActive) < 10 * 60 * 1000;
+    }
+
+    // Format last seen or message timestamp in Hindi
+    function formatLastSeen(ts) {
+      if (!ts) return "ऑफ़लाइन";
+      const diff = Date.now() - Number(ts);
+      if (diff < 10 * 60 * 1000) return "ऑनलाइन";
+      const mins = Math.floor(diff / 60000);
+      if (mins < 60) return `${mins} मिनट पहले देखा गया`;
+      const hrs = Math.floor(mins / 60);
+      if (hrs < 24) return `${hrs} घंटे पहले देखा गया`;
+      const days = Math.floor(hrs / 24);
+      return `${days} दिन पहले देखा गया`;
+    }
+
+    function formatShortTime(tsValue) {
+      if (!tsValue) return "";
+      const date = tsValue.toDate ? tsValue.toDate() : new Date(tsValue);
+      return date.toLocaleTimeString("hi-IN", { hour: "2-digit", minute: "2-digit" });
+    }
+
+    // Friendly Hindi error messages for Firebase Auth error codes
+    function getHindiAuthError(err) {
+      const code = err?.code || "";
+      switch (code) {
+        case "auth/invalid-email":
+          return "ईमेल पता सही नहीं है। कृपया सही ईमेल लिखें।";
+        case "auth/user-disabled":
+          return "यह अकाउंट बंद कर दिया गया है।";
+        case "auth/user-not-found":
+          return "इस ईमेल से कोई अकाउंट नहीं मिला। पहले साइन-अप करें।";
+        case "auth/wrong-password":
+        case "auth/invalid-credential":
+          return "ईमेल या पासवर्ड गलत है। कृपया दोबारा जांचें।";
+        case "auth/email-already-in-use":
+          return "यह ईमेल पहले से रजिस्टर है। कृपया लॉगिन करें।";
+        case "auth/weak-password":
+          return "पासवर्ड कम से कम 6 अक्षरों का होना चाहिए।";
+        case "auth/too-many-requests":
+          return "बहुत ज़्यादा गलत कोशिशें हुईं। थोड़ी देर बाद प्रयास करें।";
+        case "auth/network-request-failed":
+          return "इंटरनेट कनेक्शन नहीं है। नेटवर्क जांचें और दोबारा प्रयास करें।";
+        case "auth/popup-closed-by-user":
+          return "Google लॉगिन बीच में बंद हो गया। फिर से प्रयास करें।";
+        case "auth/popup-blocked":
+          return "पॉप-अप ब्लॉक हो गया है। रीडायरेक्ट से लॉगिन किया जा रहा है...";
+        case "auth/account-exists-with-different-credential":
+          return "यह ईमेल दूसरे लॉगिन तरीके से जुड़ा है।";
+        case "auth/operation-not-allowed":
+          return "यह लॉगिन तरीका अभी चालू नहीं है।";
+        case "auth/unauthorized-domain":
+          return "यह डोमेन Firebase Auth में अधिकृत नहीं है।";
+        case "auth/requires-recent-login":
+          return "सुरक्षा के लिए कृपया लॉगआउट करके दोबारा लॉगिन करें।";
+        default:
+          return "लॉगिन करने में समस्या आई। कृपया दोबारा प्रयास करें।";
+      }
+    }
+
+    // Screen switcher
+    function showScreen(screenId) {
+      ["splashScreen", "loginScreen", "setupScreen", "bannedScreen", "mainApp"].forEach((id) => {
+        document.getElementById(id).classList.toggle("hidden", id !== screenId);
+      });
+    }
+
+    // Modal helpers
+    function openModal(htmlContent, centered = false) {
+      const backdrop = document.getElementById("modalBackdrop");
+      const container = document.getElementById("modalContainer");
+      backdrop.classList.toggle("centered", centered);
+      container.className = centered ? "modal-dialog" : "modal-sheet";
+      container.innerHTML = (centered ? "" : '<div class="sheet-handle"></div>') + htmlContent;
+      backdrop.classList.remove("hidden");
+    }
+
+    function closeModal() {
+      document.getElementById("modalBackdrop").classList.add("hidden");
+      document.getElementById("modalContainer").innerHTML = "";
+    }
+
+    document.getElementById("modalBackdrop").addEventListener("click", (e) => {
+      if (e.target.id === "modalBackdrop") closeModal();
+    });
+
+    /* ----------------------------------------------------
+       4. LOGIN SCREEN DECORATIONS & AUTH EVENTS
+       ---------------------------------------------------- */
+    function initFloatingHearts() {
+      const layer = document.getElementById("heartsLayer");
+      layer.innerHTML = "";
+      for (let i = 0; i < 12; i++) {
+        const span = document.createElement("span");
+        span.className = "floating-heart";
+        span.textContent = i % 3 === 0 ? "💖" : i % 2 === 0 ? "💕" : "🤍";
+        span.style.left = `${6 + ((i * 8.2) % 88)}%`;
+        span.style.fontSize = `${14 + (i % 4) * 5}px`;
+        span.style.animationDuration = `${7 + (i % 5) * 2.2}s`;
+        span.style.animationDelay = `${(i * 0.7) % 6}s`;
+        layer.appendChild(span);
+      }
+    }
+    initFloatingHearts();
+
+    // Password visibility toggle
+    document.getElementById("togglePwBtn").addEventListener("click", () => {
+      const pw = document.getElementById("authPassword");
+      const isPass = pw.type === "password";
+      pw.type = isPass ? "text" : "password";
+      document.getElementById("togglePwBtn").textContent = isPass ? "🙈" : "👁️";
+    });
+
+    // Toggle Login / Sign-up mode
+    document.getElementById("toggleAuthModeBtn").addEventListener("click", () => {
+      state.isSignupMode = !state.isSignupMode;
+      document.getElementById("authErrorBox").classList.add("hidden");
+      document.getElementById("authSubmitBtn").textContent = state.isSignupMode ? "साइन-अप करो" : "लॉगिन करो";
+      document.getElementById("toggleAuthModeBtn").textContent = state.isSignupMode
+        ? "पहले से अकाउंट है? लॉगिन करो"
+        : "नए हो? साइन-अप करो";
+    });
+
+    // Email / Password Login or Signup
+    document.getElementById("authForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const email = document.getElementById("authEmail").value.trim();
+      const password = document.getElementById("authPassword").value;
+      const errBox = document.getElementById("authErrorBox");
+      const btn = document.getElementById("authSubmitBtn");
+
+      errBox.classList.add("hidden");
+      if (!email || !password) {
+        errBox.textContent = "कृपया ईमेल और पासवर्ड दोनों भरें।";
+        errBox.classList.remove("hidden");
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = state.isSignupMode ? "अकाउंट बन रहा है..." : "लॉगिन हो रहा है...";
+      try {
+        if (state.isSignupMode) {
+          await createUserWithEmailAndPassword(auth, email, password);
+          showToast("खाता बन गया! अब अपनी प्रोफ़ाइल पूरी करें।", "success");
+        } else {
+          await signInWithEmailAndPassword(auth, email, password);
+        }
+      } catch (err) {
+        errBox.textContent = getHindiAuthError(err);
+        errBox.classList.remove("hidden");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = state.isSignupMode ? "साइन-अप करो" : "लॉगिन करो";
+      }
+    });
+
+    // Google Sign-In (popup with automatic redirect fallback for Android WebView)
+    document.getElementById("googleLoginBtn").addEventListener("click", async () => {
+      const errBox = document.getElementById("authErrorBox");
+      errBox.classList.add("hidden");
+      try {
+        await signInWithPopup(auth, googleProvider, browserPopupRedirectResolver);
+      } catch (err) {
+        if (
+          err?.code === "auth/popup-blocked" ||
+          err?.code === "auth/operation-not-supported-in-this-environment"
+        ) {
+          showToast("Google लॉगिन के लिए रीडायरेक्ट हो रहा है...");
+          await signInWithRedirect(auth, googleProvider, browserPopupRedirectResolver);
+        } else {
+          errBox.textContent = getHindiAuthError(err);
+          errBox.classList.remove("hidden");
+        }
+      }
+    });
+
+    // Check redirect login result on boot
+    getRedirectResult(auth, browserPopupRedirectResolver).catch((err) => {
+      if (err) {
+        const errBox = document.getElementById("authErrorBox");
+        errBox.textContent = getHindiAuthError(err);
+        errBox.classList.remove("hidden");
+      }
+    });
+
+    /* ----------------------------------------------------
+       5. PROFILE SETUP (18+ CHECK & PHOTO BASE64)
+       ---------------------------------------------------- */
+    function bindChoiceGrid(containerId, onSelect) {
+      const grid = document.getElementById(containerId);
+      grid.querySelectorAll(".choice-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          grid.querySelectorAll(".choice-btn").forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          onSelect(btn.dataset.val);
+        });
+      });
+    }
+
+    bindChoiceGrid("setupGenderGrid", (val) => (state.setupGender = val));
+    bindChoiceGrid("setupInterestGrid", (val) => (state.setupInterest = val));
+
+    document.getElementById("setupBio").addEventListener("input", (e) => {
+      document.getElementById("setupBioCount").textContent = `${e.target.value.length}/200`;
+    });
+
+    document.getElementById("setupPhotoInput").addEventListener("change", async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      try {
+        const base64 = await resizeImageToBase64(file, 640, 0.72);
+        state.setupPhotoBase64 = base64;
+        const preview = document.getElementById("setupPhotoPreview");
+        preview.src = base64;
+        preview.classList.remove("hidden");
+        document.getElementById("setupPhotoPlaceholder").classList.add("hidden");
+      } catch (err) {
+        showToast(err.message || "फ़ोटो प्रोसेस नहीं हो सकी।", "error");
+      }
+    });
+
+    document.getElementById("setupForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const errBox = document.getElementById("setupErrorBox");
+      errBox.classList.add("hidden");
+
+      const name = document.getElementById("setupName").value.trim();
+      const dob = document.getElementById("setupDob").value;
+      const city = document.getElementById("setupCity").value.trim() || "भारत";
+      const bio = document.getElementById("setupBio").value.trim();
+
+      if (!state.setupPhotoBase64) {
+        errBox.textContent = "कृपया अपनी एक प्रोफ़ाइल फ़ोटो चुनें।";
+        errBox.classList.remove("hidden");
+        return;
+      }
+      if (name.length < 2) {
+        errBox.textContent = "कृपया अपना सही नाम लिखें।";
+        errBox.classList.remove("hidden");
+        return;
+      }
+
+      const age = calculateAge(dob);
+      if (!dob || age < 18) {
+        errBox.textContent = "माफ़ कीजिए, MeetUp केवल 18 साल या उससे ज़्यादा उम्र वालों के लिए है।";
+        errBox.classList.remove("hidden");
+        return;
+      }
+
+      const btn = document.getElementById("setupSubmitBtn");
+      btn.disabled = true;
+      btn.textContent = "प्रोफ़ाइल सेव हो रही है...";
+
+      try {
+        // Optionally capture geolocation silently if already permitted
+        let coords = {};
+        if (navigator.geolocation && navigator.permissions) {
+          try {
+            const perm = await navigator.permissions.query({ name: "geolocation" });
+            if (perm.state === "granted") {
+              coords = await new Promise((res) => {
+                navigator.geolocation.getCurrentPosition(
+                  (p) => res({ lat: p.coords.latitude, lng: p.coords.longitude }),
+                  () => res({}),
+                  { timeout: 2500 }
+                );
+              });
+            }
+          } catch (_) {}
+        }
+
+        const profileData = {
+          uid: state.user.uid,
+          email: state.user.email || "",
+          name,
+          dob,
+          age,
+          gender: state.setupGender,
+          interestedIn: state.setupInterest,
+          city,
+          bio,
+          photo: state.setupPhotoBase64,
+          photos: [state.setupPhotoBase64],
+          verified: false,
+          verificationRequested: false,
+          discoverable: true,
+          banned: false,
+          lastActive: Date.now(),
+          createdAt: Date.now(),
+          profileComplete: true,
+          ...coords
+        };
+
+        await setDoc(doc(db, "users", state.user.uid), profileData, { merge: true });
+        state.profile = profileData;
+        showToast("स्वागत है! आपकी प्रोफ़ाइल तैयार है 🎉", "success");
+        await enterMainApp();
+      } catch (err) {
+        errBox.textContent = "प्रोफ़ाइल सेव करने में त्रुटि हुई। नेटवर्क जांचें।";
+        errBox.classList.remove("hidden");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "प्रोफ़ाइल सेव करें और आगे बढ़ें";
+      }
+    });
+
+    /* ----------------------------------------------------
+       6. AUTH STATE LISTENER & BOOTSTRAP
+       ---------------------------------------------------- */
+    onAuthStateChanged(auth, async (user) => {
+      cleanupListeners();
+      state.user = user;
+      state.profile = null;
+
+      if (!user) {
+        showScreen("loginScreen");
+        return;
+      }
+
+      try {
+        const snap = await getDoc(doc(db, "users", user.uid));
+        if (!snap.exists() || !snap.data()?.profileComplete) {
+          // Pre-fill display name from Google if available
+          if (user.displayName) {
+            document.getElementById("setupName").value = user.displayName;
+          }
+          showScreen("setupScreen");
+          return;
+        }
+
+        const data = snap.data();
+        if (data.banned) {
+          showScreen("bannedScreen");
+          return;
+        }
+
+        state.profile = { ...data, uid: user.uid };
+        await enterMainApp();
+      } catch (err) {
+        showToast("डेटा लोड करने में समस्या आई।", "error");
+        showScreen("loginScreen");
+      }
+    });
+
+    document.getElementById("bannedLogoutBtn").addEventListener("click", () => signOut(auth));
+
+    function cleanupListeners() {
+      if (state.chatUnsub) { state.chatUnsub(); state.chatUnsub = null; }
+      if (state.matchesUnsub) { state.matchesUnsub(); state.matchesUnsub = null; }
+      if (state.incomingCallUnsub) { state.incomingCallUnsub(); state.incomingCallUnsub = null; }
+      if (state.presenceTimer) { clearInterval(state.presenceTimer); state.presenceTimer = null; }
+    }
+
+    async function enterMainApp() {
+      showScreen("mainApp");
+
+      // Show Admin button only if user's email is in ADMIN_EMAILS
+      const isAdmin = ADMIN_EMAILS.includes((state.user?.email || "").toLowerCase());
+      document.getElementById("adminHeaderBtn").classList.toggle("hidden", !isAdmin);
+      document.getElementById("openAdminBtn").classList.toggle("hidden", !isAdmin);
+
+      // Update user's lastActive heartbeat
+      const pingPresence = async () => {
+        if (!state.user) return;
+        try {
+          await updateDoc(doc(db, "users", state.user.uid), { lastActive: Date.now() });
+        } catch (_) {}
+      };
+      pingPresence();
+      state.presenceTimer = setInterval(pingPresence, 60000);
+
+      renderMyProfile();
+      await loadDiscoveryData();
+      subscribeMatches();
+      switchTab("home");
+    }
+
+    /* ----------------------------------------------------
+       7. DISCOVERY DATA LOADING (USERS, LIKES, BLOCKS)
+       ---------------------------------------------------- */
+    async function loadDiscoveryData() {
+      const deckLoading = document.getElementById("deckLoading");
+      if (deckLoading) deckLoading.classList.remove("hidden");
+
+      try {
+        const myUid = state.user.uid;
+        const [usersSnap, myLikesSnap, likesToMeSnap, blockedByMeSnap, blockedMeSnap] = await Promise.all([
+          getDocs(query(collection(db, "users"), limit(120))),
+          getDocs(query(collection(db, "likes"), where("from", "==", myUid))),
+          getDocs(query(collection(db, "likes"), where("to", "==", myUid))),
+          getDocs(query(collection(db, "blocks"), where("blocker", "==", myUid))),
+          getDocs(query(collection(db, "blocks"), where("blocked", "==", myUid)))
+        ]);
+
+        // Build block set
+        state.blockedSet = new Set();
+        state.blockedByMe = [];
+        blockedByMeSnap.forEach((d) => {
+          const b = d.data().blocked;
+          state.blockedSet.add(b);
+          state.blockedByMe.push(b);
+        });
+        blockedMeSnap.forEach((d) => state.blockedSet.add(d.data().blocker));
+
+        // Build my swiped likes map
+        state.myLikesMap = {};
+        myLikesSnap.forEach((d) => {
+          const data = d.data();
+          state.myLikesMap[data.to] = data.type;
+        });
+
+        // Build all visible users list
+        const usersMap = {};
+        state.allUsers = [];
+        usersSnap.forEach((d) => {
+          const u = { ...d.data(), uid: d.id };
+          usersMap[u.uid] = u;
+          if (
+            u.uid !== myUid &&
+            u.profileComplete &&
+            !u.banned &&
+            u.discoverable !== false &&
+            (u.age || 18) >= 18 &&
+            !state.blockedSet.has(u.uid)
+          ) {
+            state.allUsers.push(u);
+          }
+        });
+
+        // Build "Who Liked You" list (exclude people I already liked or passed)
+        state.likedMeList = [];
+        likesToMeSnap.forEach((d) => {
+          const l = d.data();
+          if ((l.type === "like" || l.type === "super") && !state.myLikesMap[l.from] && usersMap[l.from]) {
+            const u = usersMap[l.from];
+            if (!u.banned && !state.blockedSet.has(u.uid)) {
+              state.likedMeList.push({ user: u, type: l.type });
+            }
+          }
+        });
+
+        buildSwipeDeck();
+        renderExploreTab();
+      } catch (err) {
+        showToast("प्रोफ़ाइल लोड करने में समस्या आई।", "error");
+      }
+    }
+
+    function matchesGenderPreference(candidate) {
+      const pref = state.profile?.interestedIn || "सबसे";
+      if (pref === "महिलाओं से") return candidate.gender === "महिला";
+      if (pref === "पुरुषों से") return candidate.gender === "पुरुष";
+      return true;
+    }
+
+    function buildSwipeDeck() {
+      state.deck = state.allUsers.filter((u) => {
+        if (state.myLikesMap[u.uid]) return false; // Hide already-swiped users
+        if (!matchesGenderPreference(u)) return false;
+        const age = u.age || 18;
+        if (age < state.filters.minAge || age > state.filters.maxAge) return false;
+        if (state.filters.gender !== "सभी" && u.gender !== state.filters.gender) return false;
+        if (state.filters.maxDistance > 0) {
+          const d = getDistanceKm(state.profile, u);
+          if (d !== null && d > state.filters.maxDistance) return false;
+        }
+        return true;
+      });
+      renderDeck();
+    }
+
+    /* ----------------------------------------------------
+       8. TAB 1: SWIPEABLE CARD STACK
+       ---------------------------------------------------- */
+    function renderDeck() {
+      const deckArea = document.getElementById("deckArea");
+      const controls = document.getElementById("deckControls");
+      deckArea.innerHTML = "";
+
+      if (state.deck.length === 0) {
+        controls.classList.add("hidden");
+        deckArea.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon-circle">✨</div>
+            <div style="font-size:17px;font-weight:800;color:var(--text);">अभी और प्रोफ़ाइल नहीं हैं</div>
+            <div style="font-size:13.5px;">आपने आस-पास की सभी प्रोफ़ाइल देख ली हैं। फ़िल्टर बदलें या थोड़ी देर बाद रिफ़्रेश करें।</div>
+            <div style="display:flex;gap:10px;margin-top:8px;">
+              <button type="button" class="small-pill-btn pink" id="emptyRefreshBtn">रिफ़्रेश करें</button>
+              <button type="button" class="small-pill-btn" id="emptyGoFilterBtn">फ़िल्टर बदलें</button>
+            </div>
+          </div>
+        `;
+        document.getElementById("emptyRefreshBtn")?.addEventListener("click", loadDiscoveryData);
+        document.getElementById("emptyGoFilterBtn")?.addEventListener("click", () => switchTab("explore"));
+        return;
+      }
+
+      controls.classList.remove("hidden");
+
+      // Render top 2 cards for smooth stack depth
+      const visible = state.deck.slice(0, 2).reverse();
+      visible.forEach((user, idx) => {
+        const isTop = idx === visible.length - 1;
+        const card = createSwipeCard(user, !isTop);
+        deckArea.appendChild(card);
+        if (isTop) attachDragHandlers(card, user);
+      });
+    }
+
+    function createSwipeCard(user, isBack) {
+      const photos = Array.isArray(user.photos) && user.photos.length ? user.photos : [user.photo];
+      let photoIdx = 0;
+
+      const card = document.createElement("div");
+      card.className = `swipe-card${isBack ? " is-back" : ""}`;
+
+      const dist = getDistanceKm(state.profile, user);
+      const distText = dist !== null ? ` · ${dist} किमी दूर` : "";
+      const onlineHtml = isOnlineNow(user) ? " · अभी ऑनलाइन" : "";
+
+      const barsHtml = photos.length > 1
+        ? `<div class="photo-bars">${photos.map((_, i) => `<div class="photo-bar ${i === 0 ? "active" : ""}"></div>`).join("")}</div>`
+        : "";
+
+      card.innerHTML = `
+        ${barsHtml}
+        <div class="swipe-stamp stamp-like">लाइक ♥</div>
+        <div class="swipe-stamp stamp-pass">पास ✕</div>
+        <div class="swipe-stamp stamp-super">सुपर ★</div>
+        <img class="card-photo" src="${safeAvatar(photos[0], user.name)}" alt="${escapeHtml(user.name)}" />
+        <div class="tap-zones">
+          <div data-dir="-1"></div>
+          <div data-dir="1"></div>
+        </div>
+        <div class="card-scrim"></div>
+        <div class="card-info">
+          <div style="min-width:0;flex:1;">
+            <div class="card-name-row">
+              <h2 class="card-name">${escapeHtml(user.name)}</h2>
+              <span class="card-age tabular">${escapeHtml(user.age || 18)}</span>
+              ${user.verified ? '<span class="verified-tick" title="सत्यापित">✓</span>' : ""}
+            </div>
+            <div class="card-meta">${escapeHtml(user.city || "भारत")}${escapeHtml(distText)}${escapeHtml(onlineHtml)}</div>
+            <div class="card-bio-preview">${escapeHtml(user.bio || "")}</div>
+          </div>
+          <button type="button" class="card-info-btn" aria-label="पूरी प्रोफ़ाइल देखें">i</button>
+        </div>
+      `;
+
+      // Cycle photos when tapping left/right without dragging
+      card.querySelectorAll(".tap-zones div").forEach((zone) => {
+        zone.addEventListener("click", (e) => {
+          if (card.dataset.dragged === "1") return;
+          e.stopPropagation();
+          if (photos.length <= 1) return;
+          const dir = Number(zone.dataset.dir);
+          photoIdx = (photoIdx + dir + photos.length) % photos.length;
+          card.querySelector(".card-photo").src = safeAvatar(photos[photoIdx], user.name);
+          card.querySelectorAll(".photo-bar").forEach((bar, i) => bar.classList.toggle("active", i === photoIdx));
+        });
+      });
+
+      card.querySelector(".card-info-btn").addEventListener("click", (e) => {
+        e.stopPropagation();
+        openProfileDetailModal(user, true);
+      });
+
+      return card;
+    }
+
+    function attachDragHandlers(card, user) {
+      let startX = 0;
+      let startY = 0;
+      let currentX = 0;
+      let currentY = 0;
+      let dragging = false;
+
+      const likeStamp = card.querySelector(".stamp-like");
+      const passStamp = card.querySelector(".stamp-pass");
+      const superStamp = card.querySelector(".stamp-super");
+
+      card.addEventListener("pointerdown", (e) => {
+        if (e.target.closest(".card-info-btn")) return;
+        dragging = true;
+        card.dataset.dragged = "0";
+        startX = e.clientX;
+        startY = e.clientY;
+        currentX = 0;
+        currentY = 0;
+        card.classList.remove("animating");
+        card.setPointerCapture(e.pointerId);
+      });
+
+      card.addEventListener("pointermove", (e) => {
+        if (!dragging) return;
+        currentX = e.clientX - startX;
+        currentY = e.clientY - startY;
+        if (Math.abs(currentX) > 6 || Math.abs(currentY) > 6) {
+          card.dataset.dragged = "1";
+        }
+        const rotate = currentX * 0.06;
+        card.style.transform = `translate3d(${currentX}px, ${currentY}px, 0) rotate(${rotate}deg)`;
+
+        likeStamp.style.opacity = currentX > 20 ? Math.min(1, (currentX - 20) / 90) : 0;
+        passStamp.style.opacity = currentX < -20 ? Math.min(1, (-currentX - 20) / 90) : 0;
+        superStamp.style.opacity = currentY < -50 && Math.abs(currentX) < 60 ? Math.min(1, (-currentY - 50) / 70) : 0;
+      });
+
+      const finishDrag = () => {
+        if (!dragging) return;
+        dragging = false;
+
+        if (currentX > 105) {
+          animateSwipeOut(card, "like", user);
+        } else if (currentX < -105) {
+          animateSwipeOut(card, "pass", user);
+        } else if (currentY < -115 && Math.abs(currentX) < 80) {
+          animateSwipeOut(card, "super", user);
+        } else {
+          card.classList.add("animating");
+          card.style.transform = "translate3d(0, 0, 0) rotate(0deg)";
+          likeStamp.style.opacity = 0;
+          passStamp.style.opacity = 0;
+          superStamp.style.opacity = 0;
+        }
+      };
+
+      card.addEventListener("pointerup", finishDrag);
+      card.addEventListener("pointercancel", finishDrag);
+    }
+
+    function animateSwipeOut(card, type, user) {
+      card.classList.add("animating");
+      if (type === "like") {
+        card.querySelector(".stamp-like").style.opacity = 1;
+        card.style.transform = "translate3d(480px, 40px, 0) rotate(24deg)";
+      } else if (type === "pass") {
+        card.querySelector(".stamp-pass").style.opacity = 1;
+        card.style.transform = "translate3d(-480px, 40px, 0) rotate(-24deg)";
+      } else {
+        card.querySelector(".stamp-super").style.opacity = 1;
+        card.style.transform = "translate3d(0, -580px, 0) scale(0.9)";
+      }
+      card.style.opacity = "0";
+
+      setTimeout(() => {
+        state.deck = state.deck.filter((u) => u.uid !== user.uid);
+        renderDeck();
+        recordSwipeAction(user, type);
+      }, 240);
+    }
+
+    // Bottom round buttons for top card
+    function triggerButtonSwipe(type) {
+      if (state.deck.length === 0) return;
+      const topUser = state.deck[0];
+      const cards = document.querySelectorAll("#deckArea .swipe-card");
+      const topCard = cards[cards.length - 1];
+      if (topCard) {
+        animateSwipeOut(topCard, type, topUser);
+      }
+    }
+
+    document.getElementById("btnPass").addEventListener("click", () => triggerButtonSwipe("pass"));
+    document.getElementById("btnSuper").addEventListener("click", () => triggerButtonSwipe("super"));
+    document.getElementById("btnLike").addEventListener("click", () => triggerButtonSwipe("like"));
+    document.getElementById("refreshDeckBtn").addEventListener("click", () => {
+      showToast("प्रोफ़ाइल रिफ़्रेश हो रही हैं...");
+      loadDiscoveryData();
+    });
+
+    // Record swipe in Firestore and check mutual match
+    async function recordSwipeAction(targetUser, type) {
+      const myUid = state.user.uid;
+      state.myLikesMap[targetUser.uid] = type;
+      state.likedMeList = state.likedMeList.filter((item) => item.user.uid !== targetUser.uid);
+      renderExploreTab();
+
+      try {
+        await setDoc(doc(db, "likes", `${myUid}_${targetUser.uid}`), {
+          from: myUid,
+          to: targetUser.uid,
+          type,
+          createdAt: Date.now()
+        });
+
+        if (type === "like" || type === "super") {
+          const reverseSnap = await getDoc(doc(db, "likes", `${targetUser.uid}_${myUid}`));
+          if (reverseSnap.exists()) {
+            const revType = reverseSnap.data()?.type;
+            if (revType === "like" || revType === "super") {
+              const matchId = getMatchId(myUid, targetUser.uid);
+              const sortedUsers = [myUid, targetUser.uid].sort();
+              await setDoc(
+                doc(db, "matches", matchId),
+                {
+                  users: sortedUsers,
+                  createdAt: Date.now(),
+                  lastMessage: "",
+                  lastMessageAt: serverTimestamp(),
+                  lastMessageSender: ""
+                },
+                { merge: true }
+              );
+              showMatchCelebration(targetUser, matchId);
+            }
+          }
+        }
+      } catch (err) {
+        showToast("स्वाइप सेव करने में समस्या आई।", "error");
+      }
+    }
+
+    function showMatchCelebration(peer, matchId) {
+      state.lastMatchInfo = { peer, matchId };
+      document.getElementById("matchSubtitle").textContent = `आप और ${peer.name} दोनों ने एक-दूसरे को लाइक किया!`;
+      document.getElementById("matchMyPhoto").src = safeAvatar(state.profile.photo, state.profile.name);
+      document.getElementById("matchPeerPhoto").src = safeAvatar(peer.photo, peer.name);
+      document.getElementById("matchOverlay").classList.remove("hidden");
+    }
+
+    document.getElementById("matchKeepSwipingBtn").addEventListener("click", () => {
+      document.getElementById("matchOverlay").classList.add("hidden");
+    });
+
+    document.getElementById("matchSendMsgBtn").addEventListener("click", () => {
+      document.getElementById("matchOverlay").classList.add("hidden");
+      if (state.lastMatchInfo) {
+        switchTab("messages");
+        openChatRoom(state.lastMatchInfo.matchId, state.lastMatchInfo.peer);
+      }
+    });
+
+    /* ----------------------------------------------------
+       9. TAB 2: EXPLORE, FILTERS, LIKED ME, ONLINE STRIP
+       ---------------------------------------------------- */
+    function renderExploreTab() {
+      // 1. Online Now Strip
+      const onlineUsers = state.allUsers.filter((u) => isOnlineNow(u) && matchesGenderPreference(u));
+      document.getElementById("onlineCountLabel").textContent = `${onlineUsers.length} सक्रिय`;
+      const onlineStrip = document.getElementById("onlineStrip");
+      if (onlineUsers.length === 0) {
+        onlineStrip.innerHTML = `<div class="section-sub">अभी कोई अन्य यूज़र ऑनलाइन नहीं दिख रहा।</div>`;
+      } else {
+        onlineStrip.innerHTML = "";
+        onlineUsers.forEach((u) => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "online-item";
+          btn.innerHTML = `
+            <div class="online-avatar-ring">
+              <img src="${safeAvatar(u.photo, u.name)}" alt="${escapeHtml(u.name)}" />
+              <span class="online-dot"></span>
+            </div>
+            <span class="online-name">${escapeHtml(u.name)}</span>
+          `;
+          btn.addEventListener("click", () => openProfileDetailModal(u, true));
+          onlineStrip.appendChild(btn);
+        });
+      }
+
+      // 2. Who Liked You
+      const likedGrid = document.getElementById("likedMeGrid");
+      const likedEmpty = document.getElementById("likedMeEmpty");
+      document.getElementById("likedMeCount").textContent = state.likedMeList.length;
+      likedGrid.innerHTML = "";
+      if (state.likedMeList.length === 0) {
+        likedEmpty.classList.remove("hidden");
+      } else {
+        likedEmpty.classList.add("hidden");
+        state.likedMeList.forEach(({ user, type }) => {
+          const card = createMiniExploreCard(user, type === "super");
+          likedGrid.appendChild(card);
+        });
+      }
+
+      // 3. Filtered Explore Grid
+      const filtered = state.allUsers.filter((u) => {
+        const age = u.age || 18;
+        if (age < state.filters.minAge || age > state.filters.maxAge) return false;
+        if (state.filters.gender !== "सभी" && u.gender !== state.filters.gender) return false;
+        if (state.filters.maxDistance > 0) {
+          const d = getDistanceKm(state.profile, u);
+          if (d !== null && d > state.filters.maxDistance) return false;
+        }
+        return true;
+      });
+
+      document.getElementById("exploreResultCount").textContent = `${filtered.length} प्रोफ़ाइल`;
+      const exploreGrid = document.getElementById("exploreGrid");
+      const exploreEmpty = document.getElementById("exploreEmpty");
+      exploreGrid.innerHTML = "";
+
+      if (filtered.length === 0) {
+        exploreEmpty.classList.remove("hidden");
+      } else {
+        exploreEmpty.classList.add("hidden");
+        filtered.forEach((u) => exploreGrid.appendChild(createMiniExploreCard(u, false)));
+      }
+    }
+
+    function createMiniExploreCard(user, isSuper) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "mini-profile-card";
+      btn.innerHTML = `
+        <img src="${safeAvatar(user.photo, user.name)}" alt="${escapeHtml(user.name)}" />
+        ${isSuper ? '<span class="super-tag">★ सुपर</span>' : ""}
+        <div class="mini-card-scrim">
+          <div class="mini-card-name">${escapeHtml(user.name)}, ${escapeHtml(user.age || 18)} ${user.verified ? "✓" : ""}</div>
+          <div class="mini-card-sub">${escapeHtml(user.city || "भारत")}</div>
+        </div>
+      `;
+      btn.addEventListener("click", () => openProfileDetailModal(user, true));
+      return btn;
+    }
+
+    document.getElementById("applyFilterBtn").addEventListener("click", () => {
+      const minAge = Math.max(18, Number(document.getElementById("filterMinAge").value) || 18);
+      const maxAge = Math.max(minAge, Number(document.getElementById("filterMaxAge").value) || 45);
+      state.filters = {
+        minAge,
+        maxAge,
+        gender: document.getElementById("filterGender").value,
+        maxDistance: Number(document.getElementById("filterDistance").value) || 0
+      };
+      buildSwipeDeck();
+      renderExploreTab();
+      showToast("फ़िल्टर लागू हो गए!", "success");
+    });
+
+    document.getElementById("resetFilterBtn").addEventListener("click", () => {
+      document.getElementById("filterMinAge").value = 18;
+      document.getElementById("filterMaxAge").value = 45;
+      document.getElementById("filterGender").value = "सभी";
+      document.getElementById("filterDistance").value = "0";
+      state.filters = { minAge: 18, maxAge: 45, gender: "सभी", maxDistance: 0 };
+      buildSwipeDeck();
+      renderExploreTab();
+      showToast("फ़िल्टर रीसेट हो गए।");
+    });
+
+    /* ----------------------------------------------------
+       10. PROFILE DETAIL MODAL + REPORT & BLOCK SAFETY
+       ---------------------------------------------------- */
+    function openProfileDetailModal(user, showSwipeActions = false) {
+      const photos = Array.isArray(user.photos) && user.photos.length ? user.photos : [user.photo];
+      const dist = getDistanceKm(state.profile, user);
+      const alreadySwiped = state.myLikesMap[user.uid];
+
+      const galleryHtml = photos
+        .map((p) => `<img src="${safeAvatar(p, user.name)}" style="width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:20px;margin-bottom:10px;" alt="${escapeHtml(user.name)}" />`)
+        .join("");
+
+      const actionRow = showSwipeActions && !alreadySwiped
+        ? `<div style="display:flex;gap:10px;margin:14px 0;">
+            <button type="button" class="small-pill-btn red" style="flex:1;min-height:46px;" id="modalPassBtn">✕ पास</button>
+            <button type="button" class="small-pill-btn pink" style="flex:1;min-height:46px;" id="modalLikeBtn">♥ लाइक</button>
+           </div>`
+        : "";
+
+      openModal(`
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <div>
+              <h2 style="margin:0;font-size:22px;font-weight:800;display:flex;align-items:center;gap:6px;">
+                ${escapeHtml(user.name)}, <span class="tabular">${escapeHtml(user.age || 18)}</span>
+                ${user.verified ? '<span class="verified-tick">✓</span>' : ""}
+              </h2>
+              <div style="font-size:13px;color:var(--text-muted);margin-top:2px;">
+                ${escapeHtml(user.gender || "")} · ${escapeHtml(user.city || "भारत")}
+                ${dist !== null ? ` · ${dist} किमी दूर` : ""}
+              </div>
+            </div>
+            <button type="button" class="small-pill-btn" id="closeDetailBtn">बंद करें</button>
+          </div>
+          ${user.bio ? `<p style="font-size:14px;line-height:1.5;margin:10px 0 14px;color:var(--text);">${escapeHtml(user.bio)}</p>` : ""}
+          ${actionRow}
+          ${galleryHtml}
+          <div style="display:flex;gap:10px;margin-top:12px;">
+            <button type="button" class="small-pill-btn" style="flex:1;min-height:44px;" id="modalReportBtn">🚩 रिपोर्ट करें</button>
+            <button type="button" class="small-pill-btn red" style="flex:1;min-height:44px;" id="modalBlockBtn">🚫 ब्लॉक करें</button>
+          </div>
+        </div>
+      `);
+
+      document.getElementById("closeDetailBtn").addEventListener("click", closeModal);
+      document.getElementById("modalPassBtn")?.addEventListener("click", () => {
+        closeModal();
+        state.deck = state.deck.filter((u) => u.uid !== user.uid);
+        renderDeck();
+        recordSwipeAction(user, "pass");
+      });
+      document.getElementById("modalLikeBtn")?.addEventListener("click", () => {
+        closeModal();
+        state.deck = state.deck.filter((u) => u.uid !== user.uid);
+        renderDeck();
+        recordSwipeAction(user, "like");
+      });
+      document.getElementById("modalReportBtn").addEventListener("click", () => openReportModal(user, "profile"));
+      document.getElementById("modalBlockBtn").addEventListener("click", () => openBlockConfirmModal(user));
+    }
+
+    function openReportModal(targetUser, context = "profile") {
+      openModal(`
+        <div>
+          <h3 style="margin:0 0 6px;font-size:18px;font-weight:800;">${escapeHtml(targetUser.name)} की रिपोर्ट करें</h3>
+          <p style="font-size:13px;color:var(--text-muted);margin:0 0 12px;">कृपया रिपोर्ट करने का कारण चुनें:</p>
+          <div class="field-group">
+            <select id="reportReasonSelect" class="field-select">
+              <option value="नकली प्रोफ़ाइल">नकली प्रोफ़ाइल</option>
+              <option value="अभद्र भाषा या व्यवहार">अभद्र भाषा या व्यवहार</option>
+              <option value="स्पैम या स्कैम">स्पैम या स्कैम</option>
+              <option value="18 साल से कम उम्र">18 साल से कम उम्र</option>
+              <option value="अनुचित फ़ोटो">अनुचित फ़ोटो</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <textarea id="reportDetailsInput" class="field-textarea" maxlength="250" placeholder="अतिरिक्त जानकारी (वैकल्पिक)..."></textarea>
+          </div>
+          <div style="display:flex;gap:10px;">
+            <button type="button" class="small-pill-btn" style="flex:1;min-height:46px;" id="cancelReportBtn">रद्द करें</button>
+            <button type="button" class="small-pill-btn red" style="flex:1;min-height:46px;" id="submitReportBtn">रिपोर्ट भेजें</button>
+          </div>
+        </div>
+      `, true);
+
+      document.getElementById("cancelReportBtn").addEventListener("click", closeModal);
+      document.getElementById("submitReportBtn").addEventListener("click", async () => {
+        const reason = document.getElementById("reportReasonSelect").value;
+        const details = document.getElementById("reportDetailsInput").value.trim();
+        try {
+          await addDoc(collection(db, "reports"), {
+            reporterId: state.user.uid,
+            reporterName: state.profile.name,
+            reportedId: targetUser.uid,
+            reportedName: targetUser.name,
+            reason,
+            details,
+            context,
+            status: "open",
+            createdAt: Date.now()
+          });
+          closeModal();
+          showToast("रिपोर्ट भेज दी गई है। हमारी टीम जांच करेगी।", "success");
+        } catch (err) {
+          showToast("रिपोर्ट भेजने में त्रुटि हुई।", "error");
+        }
+      });
+    }
+
+    function openBlockConfirmModal(targetUser) {
+      openModal(`
+        <div style="text-align:center;">
+          <div style="font-size:36px;margin-bottom:6px;">🚫</div>
+          <h3 style="margin:0 0 6px;font-size:18px;font-weight:800;">${escapeHtml(targetUser.name)} को ब्लॉक करें?</h3>
+          <p style="font-size:13.5px;color:var(--text-muted);line-height:1.45;margin:0 0 16px;">
+            ब्लॉक करने के बाद आप दोनों एक-दूसरे की प्रोफ़ाइल या मैसेज नहीं देख पाएंगे।
+          </p>
+          <div style="display:flex;gap:10px;">
+            <button type="button" class="small-pill-btn" style="flex:1;min-height:46px;" id="cancelBlockBtn">नहीं</button>
+            <button type="button" class="small-pill-btn red" style="flex:1;min-height:46px;" id="confirmBlockBtn">हाँ, ब्लॉक करें</button>
+          </div>
+        </div>
+      `, true);
+
+      document.getElementById("cancelBlockBtn").addEventListener("click", closeModal);
+      document.getElementById("confirmBlockBtn").addEventListener("click", async () => {
+        try {
+          const myUid = state.user.uid;
+          await setDoc(doc(db, "blocks", `${myUid}_${targetUser.uid}`), {
+            blocker: myUid,
+            blocked: targetUser.uid,
+            createdAt: Date.now()
+          });
+          closeModal();
+          if (state.activeChatPeer?.uid === targetUser.uid) {
+            closeChatRoom();
+          }
+          showToast(`${targetUser.name} को ब्लॉक कर दिया गया।`, "success");
+          await loadDiscoveryData();
+          renderMatchesUI();
+        } catch (err) {
+          showToast("ब्लॉक करने में समस्या आई।", "error");
+        }
+      });
+    }
+
+    /* ----------------------------------------------------
+       11. TAB 3: MATCHES & REAL-TIME CHAT
+       ---------------------------------------------------- */
+    function subscribeMatches() {
+      const myUid = state.user.uid;
+      // Single-field array-contains query (sorted in JS to avoid composite index requirements)
+      const q = query(collection(db, "matches"), where("users", "array-contains", myUid));
+      state.matchesUnsub = onSnapshot(q, async (snap) => {
+        const rawMatches = [];
+        snap.forEach((d) => rawMatches.push({ id: d.id, ...d.data() }));
+
+        // Fetch missing peer user docs if needed
+        const usersById = {};
+        state.allUsers.forEach((u) => (usersById[u.uid] = u));
+
+        const resolved = [];
+        for (const m of rawMatches) {
+          const peerUid = (m.users || []).find((u) => u !== myUid);
+          if (!peerUid || state.blockedSet.has(peerUid)) continue;
+          let peer = usersById[peerUid];
+          if (!peer) {
+            try {
+              const pSnap = await getDoc(doc(db, "users", peerUid));
+              if (pSnap.exists()) peer = { ...pSnap.data(), uid: pSnap.id };
+            } catch (_) {}
+          }
+          if (!peer || peer.banned) continue;
+          resolved.push({ id: m.id, peer, data: m });
+        }
+
+        // Sort newest message first
+        resolved.sort((a, b) => {
+          const ta = a.data.lastMessageAt?.toMillis ? a.data.lastMessageAt.toMillis() : (a.data.createdAt || 0);
+          const tb = b.data.lastMessageAt?.toMillis ? b.data.lastMessageAt.toMillis() : (b.data.createdAt || 0);
+          return tb - ta;
+        });
+
+        state.matches = resolved;
+        renderMatchesUI();
+        listenIncomingCalls();
+      });
+    }
+
+    function renderMatchesUI() {
+      const newStrip = document.getElementById("newMatchesStrip");
+      const noNew = document.getElementById("noNewMatches");
+      const chatList = document.getElementById("chatList");
+      const chatEmpty = document.getElementById("chatListEmpty");
+
+      const visibleMatches = state.matches.filter((m) => !state.blockedSet.has(m.peer.uid));
+      document.getElementById("matchesCountLabel").textContent = visibleMatches.length;
+
+      newStrip.innerHTML = "";
+      chatList.innerHTML = "";
+
+      if (visibleMatches.length === 0) {
+        noNew.classList.remove("hidden");
+        chatEmpty.classList.remove("hidden");
+        return;
+      }
+
+      noNew.classList.add("hidden");
+      chatEmpty.classList.add("hidden");
+
+      visibleMatches.forEach(({ id, peer, data }) => {
+        // Top horizontal new matches bubble
+        const bubble = document.createElement("button");
+        bubble.type = "button";
+        bubble.className = "match-bubble-item";
+        bubble.innerHTML = `
+          <img src="${safeAvatar(peer.photo, peer.name)}" alt="${escapeHtml(peer.name)}" />
+          <span class="online-name">${escapeHtml(peer.name)}</span>
+        `;
+        bubble.addEventListener("click", () => openChatRoom(id, peer));
+        newStrip.appendChild(bubble);
+
+        // Chat list row
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = "chat-row";
+        const preview = data.lastMessage
+          ? escapeHtml(data.lastMessage)
+          : "नया मैच! पहले हाय बोलें 👋";
+        const timeText = data.lastMessageAt ? formatShortTime(data.lastMessageAt) : "";
+        const isPeerOnline = isOnlineNow(peer);
+
+        row.innerHTML = `
+          <div class="chat-avatar-wrap">
+            <img src="${safeAvatar(peer.photo, peer.name)}" alt="${escapeHtml(peer.name)}" />
+            ${isPeerOnline ? '<span class="online-dot"></span>' : ""}
+          </div>
+          <div class="chat-row-body">
+            <div class="chat-row-top">
+              <span class="chat-row-name">${escapeHtml(peer.name)} ${peer.verified ? "✓" : ""}</span>
+              <span class="chat-row-time tabular">${escapeHtml(timeText)}</span>
+            </div>
+            <div class="chat-row-msg">${preview}</div>
+          </div>
+        `;
+        row.addEventListener("click", () => openChatRoom(id, peer));
+        chatList.appendChild(row);
+      });
+    }
+
+    function openChatRoom(matchId, peer) {
+      state.activeChatMatchId = matchId;
+      state.activeChatPeer = peer;
+
+      document.getElementById("chatPeerAvatar").src = safeAvatar(peer.photo, peer.name);
+      document.getElementById("chatPeerName").textContent = `${peer.name}${peer.verified ? " ✓" : ""}`;
+      document.getElementById("chatPeerStatus").textContent = formatLastSeen(peer.lastActive);
+      document.getElementById("chatOverlay").classList.remove("hidden");
+
+      const msgBox = document.getElementById("chatMessages");
+      msgBox.innerHTML = `<div class="empty-state"><div class="spinner spinner-dark"></div><div>मैसेज लोड हो रहे हैं...</div></div>`;
+
+      if (state.chatUnsub) state.chatUnsub();
+      const q = query(collection(db, "matches", matchId, "messages"), orderBy("createdAt", "asc"));
+      state.chatUnsub = onSnapshot(q, async (snap) => {
+        msgBox.innerHTML = "";
+        if (snap.empty) {
+          msgBox.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-icon-circle">👋</div>
+              <div style="font-weight:700;color:var(--text);">बातचीत शुरू करें!</div>
+              <div>${escapeHtml(peer.name)} को एक प्यारा संदेश भेजें।</div>
+            </div>
+          `;
+          return;
+        }
+
+        const myUid = state.user.uid;
+        snap.forEach((d) => {
+          const msg = d.data();
+          const isMe = msg.sender === myUid;
+
+          // Mark incoming unread messages as read
+          if (!isMe && (!Array.isArray(msg.readBy) || !msg.readBy.includes(myUid))) {
+            updateDoc(doc(db, "matches", matchId, "messages", d.id), {
+              readBy: arrayUnion(myUid)
+            }).catch(() => {});
+          }
+
+          const row = document.createElement("div");
+          row.className = `msg-row ${isMe ? "me" : "them"}`;
+
+          const readTick = isMe
+            ? (Array.isArray(msg.readBy) && msg.readBy.includes(peer.uid)
+                ? '<span class="tick-read">✓✓</span>'
+                : "<span>✓</span>")
+            : "";
+
+          const bodyHtml = msg.type === "image" && msg.image
+            ? `<img class="msg-img" src="${safeAvatar(msg.image, "फ़ोटो")}" alt="भेजी गई फ़ोटो" />`
+            : `<div class="msg-bubble">${escapeHtml(msg.text || "")}</div>`;
+
+          row.innerHTML = `
+            ${bodyHtml}
+            <div class="msg-meta tabular">
+              <span>${escapeHtml(formatShortTime(msg.createdAt))}</span>
+              ${readTick}
+            </div>
+          `;
+          msgBox.appendChild(row);
+        });
+        msgBox.scrollTop = msgBox.scrollHeight;
+      });
+    }
+
+    function closeChatRoom() {
+      if (state.chatUnsub) { state.chatUnsub(); state.chatUnsub = null; }
+      state.activeChatMatchId = null;
+      state.activeChatPeer = null;
+      document.getElementById("chatOverlay").classList.add("hidden");
+    }
+
+    document.getElementById("chatBackBtn").addEventListener("click", closeChatRoom);
+    document.getElementById("chatPeerHeaderBtn").addEventListener("click", () => {
+      if (state.activeChatPeer) openProfileDetailModal(state.activeChatPeer, false);
+    });
+
+    // Chat options menu (View profile / Report / Block)
+    document.getElementById("chatMenuBtn").addEventListener("click", () => {
+      if (!state.activeChatPeer) return;
+      const peer = state.activeChatPeer;
+      openModal(`
+        <div>
+          <h3 style="margin:0 0 12px;font-size:17px;font-weight:800;">चैट विकल्प</h3>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <button type="button" class="list-menu-btn" id="chatOptProfile">👤 प्रोफ़ाइल देखें</button>
+            <button type="button" class="list-menu-btn" id="chatOptReport">🚩 ${escapeHtml(peer.name)} की रिपोर्ट करें</button>
+            <button type="button" class="list-menu-btn danger" id="chatOptBlock">🚫 ${escapeHtml(peer.name)} को ब्लॉक करें</button>
+          </div>
+        </div>
+      `);
+      document.getElementById("chatOptProfile").addEventListener("click", () => openProfileDetailModal(peer, false));
+      document.getElementById("chatOptReport").addEventListener("click", () => openReportModal(peer, "chat"));
+      document.getElementById("chatOptBlock").addEventListener("click", () => openBlockConfirmModal(peer));
+    });
+
+    // Send text message
+    document.getElementById("chatForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const input = document.getElementById("chatInput");
+      const text = input.value.trim();
+      if (!text || !state.activeChatMatchId) return;
+      input.value = "";
+      await sendChatMessage({ type: "text", text });
+    });
+
+    // Send resized photo message
+    document.getElementById("chatPhotoInput").addEventListener("change", async (e) => {
+      const file = e.target.files?.[0];
+      e.target.value = "";
+      if (!file || !state.activeChatMatchId) return;
+      try {
+        const base64 = await resizeImageToBase64(file, 640, 0.72);
+        await sendChatMessage({ type: "image", image: base64 });
+      } catch (err) {
+        showToast("फ़ोटो भेजने में समस्या आई।", "error");
+      }
+    });
+
+    async function sendChatMessage(payload) {
+      const matchId = state.activeChatMatchId;
+      const myUid = state.user.uid;
+      try {
+        await addDoc(collection(db, "matches", matchId, "messages"), {
+          sender: myUid,
+          type: payload.type,
+          text: payload.text || "",
+          image: payload.image || "",
+          createdAt: serverTimestamp(),
+          readBy: [myUid]
+        });
+        await updateDoc(doc(db, "matches", matchId), {
+          lastMessage: payload.type === "image" ? "📷 फ़ोटो भेजी" : payload.text,
+          lastMessageAt: serverTimestamp(),
+          lastMessageSender: myUid
+        });
+      } catch (err) {
+        showToast("मैसेज भेजा नहीं जा सका।", "error");
+      }
+    }
+
+    /* ----------------------------------------------------
+       12. AUDIO & VIDEO CALLING (WebRTC + Firestore Signaling)
+       ---------------------------------------------------- */
+    // NOTE: Uses peer-to-peer WebRTC with Google STUN + Firestore signaling.
+    // PLUG IN ZEGOCLOUD SDK HERE if you want managed TURN/SFU scaling in production.
+    const rtcConfig = {
+      iceServers: [
+        { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }
+      ]
+    };
+
+    document.getElementById("audioCallBtn").addEventListener("click", () => {
+      if (state.activeChatMatchId && state.activeChatPeer) {
+        startOutgoingCall(state.activeChatMatchId, state.activeChatPeer, "audio");
+      }
+    });
+
+    document.getElementById("videoCallBtn").addEventListener("click", () => {
+      if (state.activeChatMatchId && state.activeChatPeer) {
+        startOutgoingCall(state.activeChatMatchId, state.activeChatPeer, "video");
+      }
+    });
+
+    async function startOutgoingCall(matchId, peer, callType) {
+      callState.matchId = matchId;
+      callState.peer = peer;
+      callState.type = callType;
+      callState.isCaller = true;
+
+      showCallOverlay(peer, callType, "रिंग हो रही है...", false);
+
+      try {
+        callState.localStream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: callType === "video"
+        });
+        const localVid = document.getElementById("localVideo");
+        if (callType === "video") {
+          localVid.srcObject = callState.localStream;
+          localVid.classList.remove("hidden");
+        }
+      } catch (err) {
+        showToast("कैमरा/माइक की अनुमति नहीं मिली, ऑडियो-ओनली मॉक मोड।", "error");
+      }
+
+      try {
+        callState.pc = new RTCPeerConnection(rtcConfig);
+        if (callState.localStream) {
+          callState.localStream.getTracks().forEach((t) => callState.pc.addTrack(t, callState.localStream));
+        }
+
+        callState.remoteStream = new MediaStream();
+        const remoteVid = document.getElementById("remoteVideo");
+        remoteVid.srcObject = callState.remoteStream;
+
+        callState.pc.ontrack = (event) => {
+          event.streams[0].getTracks().forEach((t) => callState.remoteStream.addTrack(t));
+          if (callType === "video") {
+            remoteVid.classList.remove("hidden");
+            document.getElementById("callPeerAvatar").classList.add("hidden");
+          }
+        };
+
+        const callDocRef = doc(db, "matches", matchId, "calls", "active");
+        const offerCandidates = collection(callDocRef, "offerCandidates");
+        const answerCandidates = collection(callDocRef, "answerCandidates");
+
+        callState.pc.onicecandidate = (e) => {
+          if (e.candidate) addDoc(offerCandidates, e.candidate.toJSON()).catch(() => {});
+        };
+
+        const offer = await callState.pc.createOffer();
+        await callState.pc.setLocalDescription(offer);
+
+        await setDoc(callDocRef, {
+          callerId: state.user.uid,
+          callerName: state.profile.name,
+          calleeId: peer.uid,
+          type: callType,
+          status: "ringing",
+          offer: { type: offer.type, sdp: offer.sdp },
+          createdAt: Date.now()
+        });
+
+        callState.callDocUnsub = onSnapshot(callDocRef, async (snap) => {
+          const data = snap.data();
+          if (!data || data.status === "ended" || data.status === "rejected") {
+            endActiveCall(false);
+            return;
+          }
+          if (data.answer && !callState.pc.currentRemoteDescription) {
+            await callState.pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+            startCallTimer();
+          }
+        });
+
+        onSnapshot(answerCandidates, (snap) => {
+          snap.docChanges().forEach((ch) => {
+            if (ch.type === "added" && callState.pc) {
+              callState.pc.addIceCandidate(new RTCIceCandidate(ch.doc.data())).catch(() => {});
+            }
+          });
+        });
+      } catch (err) {
+        showToast("कॉल शुरू नहीं हो सकी।", "error");
+        endActiveCall(true);
+      }
+    }
+
+    function listenIncomingCalls() {
+      if (state.incomingCallUnsub) state.incomingCallUnsub();
+      if (!state.matches.length) return;
+
+      // Listen on active calls for user's matches
+      const unsubs = state.matches.slice(0, 15).map(({ id, peer }) => {
+        const callDocRef = doc(db, "matches", id, "calls", "active");
+        return onSnapshot(callDocRef, (snap) => {
+          const data = snap.data();
+          if (
+            data &&
+            data.status === "ringing" &&
+            data.calleeId === state.user.uid &&
+            !callState.pc &&
+            Date.now() - (data.createdAt || 0) < 45000
+          ) {
+            callState.matchId = id;
+            callState.peer = peer;
+            callState.type = data.type || "video";
+            callState.isCaller = false;
+            showCallOverlay(peer, callState.type, "आने वाली कॉल...", true);
+          }
+        });
+      });
+
+      state.incomingCallUnsub = () => unsubs.forEach((fn) => fn());
+    }
+
+    document.getElementById("acceptCallBtn").addEventListener("click", async () => {
+      if (!callState.matchId) return;
+      document.getElementById("callIncomingControls").classList.add("hidden");
+      document.getElementById("callActiveControls").classList.remove("hidden");
+
+      try {
+        callState.localStream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: callState.type === "video"
+        });
+        if (callState.type === "video") {
+          const localVid = document.getElementById("localVideo");
+          localVid.srcObject = callState.localStream;
+          localVid.classList.remove("hidden");
+        }
+
+        callState.pc = new RTCPeerConnection(rtcConfig);
+        callState.localStream.getTracks().forEach((t) => callState.pc.addTrack(t, callState.localStream));
+
+        callState.remoteStream = new MediaStream();
+        const remoteVid = document.getElementById("remoteVideo");
+        remoteVid.srcObject = callState.remoteStream;
+        callState.pc.ontrack = (event) => {
+          event.streams[0].getTracks().forEach((t) => callState.remoteStream.addTrack(t));
+          if (callState.type === "video") {
+            remoteVid.classList.remove("hidden");
+            document.getElementById("callPeerAvatar").classList.add("hidden");
+          }
+        };
+
+        const callDocRef = doc(db, "matches", callState.matchId, "calls", "active");
+        const offerCandidates = collection(callDocRef, "offerCandidates");
+        const answerCandidates = collection(callDocRef, "answerCandidates");
+
+        callState.pc.onicecandidate = (e) => {
+          if (e.candidate) addDoc(answerCandidates, e.candidate.toJSON()).catch(() => {});
+        };
+
+        const snap = await getDoc(callDocRef);
+        const callData = snap.data();
+        await callState.pc.setRemoteDescription(new RTCSessionDescription(callData.offer));
+        const answer = await callState.pc.createAnswer();
+        await callState.pc.setLocalDescription(answer);
+
+        await updateDoc(callDocRef, {
+          status: "connected",
+          answer: { type: answer.type, sdp: answer.sdp }
+        });
+
+        onSnapshot(offerCandidates, (s) => {
+          s.docChanges().forEach((ch) => {
+            if (ch.type === "added" && callState.pc) {
+              callState.pc.addIceCandidate(new RTCIceCandidate(ch.doc.data())).catch(() => {});
+            }
+          });
+        });
+
+        callState.callDocUnsub = onSnapshot(callDocRef, (s) => {
+          if (!s.exists() || s.data().status === "ended") endActiveCall(false);
+        });
+
+        startCallTimer();
+      } catch (err) {
+        showToast("कॉल कनेक्ट नहीं हो सकी।", "error");
+        endActiveCall(true);
+      }
+    });
+
+    document.getElementById("rejectCallBtn").addEventListener("click", async () => {
+      if (callState.matchId) {
+        await updateDoc(doc(db, "matches", callState.matchId, "calls", "active"), { status: "rejected" }).catch(() => {});
+      }
+      endActiveCall(false);
+    });
+
+    document.getElementById("endCallBtn").addEventListener("click", () => endActiveCall(true));
+
+    document.getElementById("toggleMicBtn").addEventListener("click", () => {
+      callState.micEnabled = !callState.micEnabled;
+      callState.localStream?.getAudioTracks().forEach((t) => (t.enabled = callState.micEnabled));
+      document.getElementById("toggleMicBtn").textContent = callState.micEnabled ? "🎤" : "🔇";
+    });
+
+    document.getElementById("toggleCamBtn").addEventListener("click", () => {
+      callState.camEnabled = !callState.camEnabled;
+      callState.localStream?.getVideoTracks().forEach((t) => (t.enabled = callState.camEnabled));
+      document.getElementById("toggleCamBtn").textContent = callState.camEnabled ? "📷" : "🚫";
+    });
+
+    function showCallOverlay(peer, type, statusText, isIncoming) {
+      document.getElementById("callTypeLabel").textContent = type === "video" ? "वीडियो कॉल" : "ऑडियो कॉल";
+      document.getElementById("callPeerName").textContent = peer.name;
+      document.getElementById("callStatusText").textContent = statusText;
+      document.getElementById("callPeerAvatar").src = safeAvatar(peer.photo, peer.name);
+      document.getElementById("callPeerAvatar").classList.remove("hidden");
+      document.getElementById("remoteVideo").classList.add("hidden");
+      document.getElementById("localVideo").classList.add("hidden");
+      document.getElementById("callIncomingControls").classList.toggle("hidden", !isIncoming);
+      document.getElementById("callActiveControls").classList.toggle("hidden", isIncoming);
+      document.getElementById("callOverlay").classList.remove("hidden");
+    }
+
+    function startCallTimer() {
+      if (callState.timerInterval) clearInterval(callState.timerInterval);
+      callState.seconds = 0;
+      callState.timerInterval = setInterval(() => {
+        callState.seconds++;
+        const mins = String(Math.floor(callState.seconds / 60)).padStart(2, "0");
+        const secs = String(callState.seconds % 60).padStart(2, "0");
+        document.getElementById("callStatusText").textContent = `${mins}:${secs}`;
+      }, 1000);
+    }
+
+    async function endActiveCall(updateRemote = true) {
+      if (updateRemote && callState.matchId) {
+        await updateDoc(doc(db, "matches", callState.matchId, "calls", "active"), { status: "ended" }).catch(() => {});
+      }
+      if (callState.callDocUnsub) { callState.callDocUnsub(); callState.callDocUnsub = null; }
+      if (callState.timerInterval) { clearInterval(callState.timerInterval); callState.timerInterval = null; }
+      if (callState.pc) { callState.pc.close(); callState.pc = null; }
+      if (callState.localStream) {
+        callState.localStream.getTracks().forEach((t) => t.stop());
+        callState.localStream = null;
+      }
+      callState.matchId = null;
+      callState.peer = null;
+      callState.micEnabled = true;
+      callState.camEnabled = true;
+      document.getElementById("callOverlay").classList.add("hidden");
+    }
+
+    /* ----------------------------------------------------
+       13. TAB 4: MY PROFILE, PHOTOS, SETTINGS, DELETE, ADMIN
+       ---------------------------------------------------- */
+    function renderMyProfile() {
+      const p = state.profile;
+      if (!p) return;
+
+      document.getElementById("myProfileAvatar").src = safeAvatar(p.photo, p.name);
+      document.getElementById("myProfileName").textContent = `${p.name}, ${p.age || 18}`;
+      document.getElementById("myVerifiedBadge").classList.toggle("hidden", !p.verified);
+      document.getElementById("myProfileSub").textContent = `${p.gender} · ${p.city || "भारत"} · ${p.interestedIn}`;
+      document.getElementById("myProfileBio").textContent = p.bio || "कोई बायो नहीं लिखा है।";
+      document.getElementById("verifyStatusText").textContent = p.verified
+        ? "✅ सत्यापित प्रोफ़ाइल"
+        : p.verificationRequested
+        ? "⏳ समीक्षा में"
+        : "असत्यापित";
+
+      const photos = Array.isArray(p.photos) && p.photos.length ? p.photos : [p.photo];
+      document.getElementById("myPhotoCount").textContent = `${photos.length}/6`;
+      const grid = document.getElementById("myPhotosGrid");
+      grid.innerHTML = "";
+
+      photos.forEach((src, idx) => {
+        const slot = document.createElement("div");
+        slot.className = "photo-slot";
+        slot.innerHTML = `
+          <img src="${safeAvatar(src, p.name)}" alt="फ़ोटो ${idx + 1}" />
+          <div class="photo-slot-actions">
+            ${idx !== 0 ? `<button type="button" class="photo-mini-btn" data-act="main" data-idx="${idx}" title="मुख्य फ़ोटो बनाएं">★</button>` : ""}
+            ${photos.length > 1 ? `<button type="button" class="photo-mini-btn" data-act="del" data-idx="${idx}" title="हटाएं">✕</button>` : ""}
+          </div>
+        `;
+        slot.querySelectorAll(".photo-mini-btn").forEach((b) => {
+          b.addEventListener("click", () => handlePhotoSlotAction(b.dataset.act, Number(b.dataset.idx)));
+        });
+        grid.appendChild(slot);
+      });
+
+      if (photos.length < 6) {
+        const addSlot = document.createElement("button");
+        addSlot.type = "button";
+        addSlot.className = "photo-slot";
+        addSlot.innerHTML = `<div style="text-align:center;font-size:12px;font-weight:700;"><div style="font-size:24px;">＋</div>जोड़ें</div>`;
+        addSlot.addEventListener("click", () => document.getElementById("addExtraPhotoInput").click());
+        grid.appendChild(addSlot);
+      }
+    }
+
+    async function handlePhotoSlotAction(act, idx) {
+      const photos = [...(state.profile.photos || [state.profile.photo])];
+      if (act === "main") {
+        const [picked] = photos.splice(idx, 1);
+        photos.unshift(picked);
+      } else if (act === "del" && photos.length > 1) {
+        photos.splice(idx, 1);
+      }
+      try {
+        await updateDoc(doc(db, "users", state.user.uid), { photos, photo: photos[0] });
+        state.profile.photos = photos;
+        state.profile.photo = photos[0];
+        renderMyProfile();
+        showToast("फ़ोटो अपडेट हो गई!", "success");
+      } catch (err) {
+        showToast("फ़ोटो अपडेट नहीं हो सकी।", "error");
+      }
+    }
+
+    document.getElementById("addExtraPhotoInput").addEventListener("change", async (e) => {
+      const file = e.target.files?.[0];
+      e.target.value = "";
+      if (!file) return;
+      try {
+        const base64 = await resizeImageToBase64(file, 640, 0.72);
+        const photos = [...(state.profile.photos || [state.profile.photo]), base64].slice(0, 6);
+        await updateDoc(doc(db, "users", state.user.uid), { photos, photo: photos[0] });
+        state.profile.photos = photos;
+        renderMyProfile();
+        showToast("नई फ़ोटो जुड़ गई!", "success");
+      } catch (err) {
+        showToast("फ़ोटो जोड़ने में समस्या आई।", "error");
+      }
+    });
+
+    // Selfie photo verification upload
+    document.getElementById("verifySelfieInput").addEventListener("change", async (e) => {
+      const file = e.target.files?.[0];
+      e.target.value = "";
+      if (!file) return;
+      try {
+        const selfie = await resizeImageToBase64(file, 640, 0.72);
+        await updateDoc(doc(db, "users", state.user.uid), {
+          verificationSelfie: selfie,
+          verificationRequested: true
+        });
+        state.profile.verificationRequested = true;
+        renderMyProfile();
+        showToast("सेल्फ़ी भेज दी गई! एडमिन जल्द ही वेरिफ़ाई करेंगे।", "success");
+      } catch (err) {
+        showToast("सेल्फ़ी अपलोड नहीं हो सकी।", "error");
+      }
+    });
+
+    // Edit Profile Modal
+    document.getElementById("openEditProfileBtn").addEventListener("click", () => {
+      const p = state.profile;
+      openModal(`
+        <div>
+          <h3 style="margin:0 0 14px;font-size:18px;font-weight:800;">प्रोफ़ाइल एडिट करें</h3>
+          <div class="field-group">
+            <label class="field-label" for="editName">नाम</label>
+            <input type="text" id="editName" class="field-input" value="${escapeHtml(p.name)}" maxlength="40" />
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="editCity">शहर</label>
+            <input type="text" id="editCity" class="field-input" value="${escapeHtml(p.city || "")}" maxlength="40" />
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="editGender">लिंग</label>
+            <select id="editGender" class="field-select">
+              <option value="पुरुष" ${p.gender === "पुरुष" ? "selected" : ""}>पुरुष</option>
+              <option value="महिला" ${p.gender === "महिला" ? "selected" : ""}>महिला</option>
+              <option value="अन्य" ${p.gender === "अन्य" ? "selected" : ""}>अन्य</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="editInterest">किसमें दिलचस्पी है?</label>
+            <select id="editInterest" class="field-select">
+              <option value="महिलाओं से" ${p.interestedIn === "महिलाओं से" ? "selected" : ""}>महिलाओं से</option>
+              <option value="पुरुषों से" ${p.interestedIn === "पुरुषों से" ? "selected" : ""}>पुरुषों से</option>
+              <option value="सबसे" ${p.interestedIn === "सबसे" ? "selected" : ""}>सबसे</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="editBio">बायो (अधिकतम 200 अक्षर)</label>
+            <textarea id="editBio" class="field-textarea" maxlength="200">${escapeHtml(p.bio || "")}</textarea>
+          </div>
+          <div style="display:flex;gap:10px;">
+            <button type="button" class="small-pill-btn" style="flex:1;min-height:46px;" id="cancelEditBtn">रद्द करें</button>
+            <button type="button" class="btn-grad-pill" style="flex:1;min-height:46px;" id="saveEditBtn">सेव करें</button>
+          </div>
+        </div>
+      `);
+
+      document.getElementById("cancelEditBtn").addEventListener("click", closeModal);
+      document.getElementById("saveEditBtn").addEventListener("click", async () => {
+        const updates = {
+          name: document.getElementById("editName").value.trim() || p.name,
+          city: document.getElementById("editCity").value.trim() || "भारत",
+          gender: document.getElementById("editGender").value,
+          interestedIn: document.getElementById("editInterest").value,
+          bio: document.getElementById("editBio").value.trim()
+        };
+        try {
+          await updateDoc(doc(db, "users", state.user.uid), updates);
+          state.profile = { ...state.profile, ...updates };
+          closeModal();
+          renderMyProfile();
+          buildSwipeDeck();
+          showToast("प्रोफ़ाइल अपडेट हो गई!", "success");
+        } catch (err) {
+          showToast("अपडेट करने में समस्या आई।", "error");
+        }
+      });
+    });
+
+    // Settings & Blocked Users Modal
+    document.getElementById("openSettingsBtn").addEventListener("click", async () => {
+      const discoverable = state.profile.discoverable !== false;
+      openModal(`
+        <div>
+          <h3 style="margin:0 0 12px;font-size:18px;font-weight:800;">सेटिंग्स और सुरक्षा</h3>
+          <div class="admin-row">
+            <div>
+              <div style="font-weight:700;font-size:14.5px;">डिस्कवरी में मेरी प्रोफ़ाइल दिखाएं</div>
+              <div style="font-size:12px;color:var(--text-muted);">बंद करने पर आप स्वाइप में नहीं दिखेंगे</div>
+            </div>
+            <button type="button" class="small-pill-btn ${discoverable ? "green" : ""}" id="toggleDiscoveryBtn">
+              ${discoverable ? "चालू है" : "बंद है"}
+            </button>
+          </div>
+          <h4 style="margin:16px 0 8px;font-size:15px;font-weight:800;">ब्लॉक किए गए यूज़र</h4>
+          <div id="blockedListBox" style="font-size:13px;color:var(--text-muted);">लोड हो रहा है...</div>
+        </div>
+      `);
+
+      document.getElementById("toggleDiscoveryBtn").addEventListener("click", async (e) => {
+        const next = !(state.profile.discoverable !== false);
+        await updateDoc(doc(db, "users", state.user.uid), { discoverable: next });
+        state.profile.discoverable = next;
+        e.target.textContent = next ? "चालू है" : "बंद है";
+        e.target.className = `small-pill-btn ${next ? "green" : ""}`;
+        showToast("सेटिंग सेव हो गई!");
+      });
+
+      const listBox = document.getElementById("blockedListBox");
+      if (state.blockedByMe.length === 0) {
+        listBox.textContent = "आपने किसी को ब्लॉक नहीं किया है।";
+      } else {
+        listBox.innerHTML = "";
+        for (const uid of state.blockedByMe) {
+          let name = uid;
+          try {
+            const s = await getDoc(doc(db, "users", uid));
+            if (s.exists()) name = s.data().name || uid;
+          } catch (_) {}
+          const row = document.createElement("div");
+          row.className = "admin-row";
+          row.innerHTML = `<span>${escapeHtml(name)}</span><button type="button" class="small-pill-btn">अनब्लॉक करें</button>`;
+          row.querySelector("button").addEventListener("click", async () => {
+            await deleteDoc(doc(db, "blocks", `${state.user.uid}_${uid}`));
+            showToast(`${name} को अनब्लॉक किया गया।`, "success");
+            closeModal();
+            await loadDiscoveryData();
+            renderMatchesUI();
+          });
+          listBox.appendChild(row);
+        }
+      }
+    });
+
+    // Logout with confirmation
+    document.getElementById("logoutBtn").addEventListener("click", () => {
+      openModal(`
+        <div style="text-align:center;">
+          <h3 style="margin:0 0 8px;font-size:18px;font-weight:800;">लॉगआउट करना चाहते हैं?</h3>
+          <p style="font-size:13.5px;color:var(--text-muted);margin:0 0 16px;">आप कभी भी दोबारा लॉगिन कर सकते हैं।</p>
+          <div style="display:flex;gap:10px;">
+            <button type="button" class="small-pill-btn" style="flex:1;min-height:46px;" id="cancelLogoutBtn">रद्द करें</button>
+            <button type="button" class="small-pill-btn pink" style="flex:1;min-height:46px;" id="confirmLogoutBtn">हाँ, लॉगआउट</button>
+          </div>
+        </div>
+      `, true);
+      document.getElementById("cancelLogoutBtn").addEventListener("click", closeModal);
+      document.getElementById("confirmLogoutBtn").addEventListener("click", async () => {
+        closeModal();
+        await signOut(auth);
+      });
+    });
+
+    // Delete Account with confirmation
+    document.getElementById("deleteAccountBtn").addEventListener("click", () => {
+      openModal(`
+        <div style="text-align:center;">
+          <div style="font-size:36px;margin-bottom:6px;">⚠️</div>
+          <h3 style="margin:0 0 8px;font-size:18px;font-weight:800;color:var(--red);">अकाउंट हमेशा के लिए डिलीट करें?</h3>
+          <p style="font-size:13.5px;color:var(--text-muted);margin:0 0 16px;line-height:1.45;">
+            आपकी प्रोफ़ाइल, फ़ोटो और सभी डेटा हमेशा के लिए मिट जाएंगे। यह वापस नहीं आ सकता।
+          </p>
+          <div style="display:flex;gap:10px;">
+            <button type="button" class="small-pill-btn" style="flex:1;min-height:46px;" id="cancelDelBtn">रद्द करें</button>
+            <button type="button" class="small-pill-btn red" style="flex:1;min-height:46px;" id="confirmDelBtn">हाँ, डिलीट करें</button>
+          </div>
+        </div>
+      `, true);
+      document.getElementById("cancelDelBtn").addEventListener("click", closeModal);
+      document.getElementById("confirmDelBtn").addEventListener("click", async () => {
+        try {
+          const uid = state.user.uid;
+          await deleteDoc(doc(db, "users", uid));
+          await deleteUser(auth.currentUser);
+          closeModal();
+          showToast("आपका अकाउंट डिलीट कर दिया गया।");
+        } catch (err) {
+          closeModal();
+          showToast(getHindiAuthError(err), "error");
+        }
+      });
+    });
+
+    /* ----------------------------------------------------
+       14. ADMIN PANEL (VISIBLE ONLY TO ADMIN_EMAILS)
+       ---------------------------------------------------- */
+    async function openAdminPanel() {
+      if (!ADMIN_EMAILS.includes((state.user?.email || "").toLowerCase())) return;
+      openModal(`
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+            <h3 style="margin:0;font-size:18px;font-weight:800;">🛡️ एडमिन पैनल</h3>
+            <button type="button" class="small-pill-btn" id="closeAdminBtn">बंद करें</button>
+          </div>
+          <div style="display:flex;gap:8px;margin-bottom:12px;">
+            <button type="button" class="small-pill-btn pink" id="adminTabUsers">यूज़र</button>
+            <button type="button" class="small-pill-btn" id="adminTabReports">रिपोर्ट्स</button>
+          </div>
+          <div id="adminBody" style="font-size:13.5px;">लोड हो रहा है...</div>
+        </div>
+      `);
+
+      document.getElementById("closeAdminBtn").addEventListener("click", closeModal);
+
+      const loadUsersAdmin = async () => {
+        document.getElementById("adminTabUsers").className = "small-pill-btn pink";
+        document.getElementById("adminTabReports").className = "small-pill-btn";
+        const body = document.getElementById("adminBody");
+        body.textContent = "यूज़र लोड हो रहे हैं...";
+        const snap = await getDocs(query(collection(db, "users"), limit(100)));
+        body.innerHTML = "";
+        snap.forEach((d) => {
+          const u = { ...d.data(), uid: d.id };
+          const row = document.createElement("div");
+          row.className = "admin-row";
+          row.innerHTML = `
+            <div style="min-width:0;flex:1;">
+              <div style="font-weight:800;">${escapeHtml(u.name || "बिना नाम")} (${escapeHtml(u.age || "-")}) ${u.verified ? "✓" : ""}</div>
+              <div style="font-size:11.5px;color:var(--text-muted);">${escapeHtml(u.email || u.uid)} ${u.banned ? "· 🚫 बैन" : ""}</div>
+            </div>
+            <div style="display:flex;gap:6px;">
+              <button type="button" class="small-pill-btn ${u.verified ? "green" : ""}" data-act="verify">${u.verified ? "✓ सत्यापित" : "वेरिफ़ाई"}</button>
+              <button type="button" class="small-pill-btn red" data-act="ban">${u.banned ? "अनबैन" : "बैन"}</button>
+            </div>
+          `;
+          row.querySelector('[data-act="verify"]').addEventListener("click", async () => {
+            await updateDoc(doc(db, "users", u.uid), { verified: !u.verified });
+            showToast("वेरिफ़िकेशन अपडेट किया गया!", "success");
+            loadUsersAdmin();
+          });
+          row.querySelector('[data-act="ban"]').addEventListener("click", async () => {
+            await updateDoc(doc(db, "users", u.uid), { banned: !u.banned });
+            showToast(u.banned ? "यूज़र अनबैन किया गया।" : "यूज़र बैन किया गया।");
+            loadUsersAdmin();
+          });
+          body.appendChild(row);
+        });
+      };
+
+      const loadReportsAdmin = async () => {
+        document.getElementById("adminTabUsers").className = "small-pill-btn";
+        document.getElementById("adminTabReports").className = "small-pill-btn pink";
+        const body = document.getElementById("adminBody");
+        body.textContent = "रिपोर्ट्स लोड हो रही हैं...";
+        const snap = await getDocs(query(collection(db, "reports"), limit(60)));
+        body.innerHTML = "";
+        if (snap.empty) {
+          body.textContent = "कोई रिपोर्ट नहीं है।";
+          return;
+        }
+        snap.forEach((d) => {
+          const r = d.data();
+          const row = document.createElement("div");
+          row.className = "admin-row";
+          row.innerHTML = `
+            <div style="min-width:0;flex:1;">
+              <div style="font-weight:800;">${escapeHtml(r.reportedName || r.reportedId)} · ${escapeHtml(r.reason)}</div>
+              <div style="font-size:11.5px;color:var(--text-muted);">रिपोर्टर: ${escapeHtml(r.reporterName || "-")} ${r.details ? `· "${escapeHtml(r.details)}"` : ""}</div>
+            </div>
+            <div style="display:flex;gap:6px;">
+              <button type="button" class="small-pill-btn red" data-act="banReported">बैन करें</button>
+              <button type="button" class="small-pill-btn" data-act="dismiss">हटाएं</button>
+            </div>
+          `;
+          row.querySelector('[data-act="banReported"]').addEventListener("click", async () => {
+            await updateDoc(doc(db, "users", r.reportedId), { banned: true });
+            await deleteDoc(doc(db, "reports", d.id));
+            showToast("रिपोर्टेड यूज़र को बैन कर दिया गया।");
+            loadReportsAdmin();
+          });
+          row.querySelector('[data-act="dismiss"]').addEventListener("click", async () => {
+            await deleteDoc(doc(db, "reports", d.id));
+            loadReportsAdmin();
+          });
+          body.appendChild(row);
+        });
+      };
+
+      document.getElementById("adminTabUsers").addEventListener("click", loadUsersAdmin);
+      document.getElementById("adminTabReports").addEventListener("click", loadReportsAdmin);
+      loadUsersAdmin();
+    }
+
+    document.getElementById("adminHeaderBtn").addEventListener("click", openAdminPanel);
+    document.getElementById("openAdminBtn").addEventListener("click", openAdminPanel);
+
+    /* ----------------------------------------------------
+       15. BOTTOM NAVIGATION SWITCHING
+       ---------------------------------------------------- */
+    function switchTab(tabName) {
+      state.activeTab = tabName;
+      const titles = {
+        home: "MeetUp",
+        explore: "सर्च और एक्सप्लोर",
+        messages: "मैसेज और मैच",
+        profile: "मेरी प्रोफ़ाइल"
+      };
+      document.getElementById("topBarTitle").textContent = titles[tabName] || "MeetUp";
+      document.querySelectorAll(".tab-pane").forEach((el) => {
+        el.classList.toggle("active", el.id === `tab-${tabName}`);
+      });
+      document.querySelectorAll(".nav-tab").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.tab === tabName);
+      });
+    }
+
+    document.querySelectorAll(".nav-tab").forEach((btn) => {
+      btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+    });
+  </script>
+</body>
+</html>

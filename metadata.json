@@ -1,0 +1,6 @@
+{
+  "name": "MeetUp — अपना मैच ढूंढो",
+  "description": "MeetUp: मोबाइल-फ़र्स्ट हिंदी डेटिंग ऐप (Firebase Auth और Firestore के साथ)।",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
