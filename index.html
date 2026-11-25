@@ -2301,6 +2301,7 @@
 
     const db = getFirestore(app);
     const googleProvider = new GoogleAuthProvider();
+    googleProvider.setCustomParameters({ prompt: "select_account" });
 
     /* ----------------------------------------------------
        2. GLOBAL STATE
@@ -2514,15 +2515,20 @@
         case "auth/network-request-failed":
           return "इंटरनेट कनेक्शन नहीं है। नेटवर्क जांचें और दोबारा प्रयास करें।";
         case "auth/popup-closed-by-user":
+        case "auth/cancelled-popup-request":
           return "Google लॉगिन बीच में बंद हो गया। फिर से प्रयास करें।";
         case "auth/popup-blocked":
-          return "पॉप-अप ब्लॉक हो गया है। रीडायरेक्ट से लॉगिन किया जा रहा है...";
+          return "ब्राउज़र ने Google लॉगिन पॉप-अप ब्लॉक कर दिया है। पॉप-अप की अनुमति देकर फिर से प्रयास करें, या ईमेल/पासवर्ड से लॉगिन करें।";
+        case "auth/missing-initial-state":
+          return "ब्राउज़र के स्टोरेज प्रतिबंध के कारण रीडायरेक्ट लॉगिन नहीं हो सका। कृपया पॉप-अप लॉगिन या ईमेल/पासवर्ड का उपयोग करें।";
         case "auth/account-exists-with-different-credential":
           return "यह ईमेल दूसरे लॉगिन तरीके से जुड़ा है।";
         case "auth/operation-not-allowed":
-          return "यह लॉगिन तरीका अभी चालू नहीं है।";
+          return "Google लॉगिन अभी Firebase Console में चालू नहीं है।";
+        case "auth/operation-not-supported-in-this-environment":
+          return "इस ब्राउज़र/WebView में Google पॉप-अप सपोर्ट नहीं है। ऐप को Firebase Hosting (HTTPS) पर चलाएं या ईमेल/पासवर्ड से लॉगिन करें।";
         case "auth/unauthorized-domain":
-          return "यह डोमेन Firebase Auth में अधिकृत नहीं है।";
+          return "यह डोमेन Firebase Auth → Authorized domains में जोड़ा नहीं गया है।";
         case "auth/requires-recent-login":
           return "सुरक्षा के लिए कृपया लॉगआउट करके दोबारा लॉगिन करें।";
         default:
@@ -2626,16 +2632,24 @@
       }
     });
 
-    // Google Sign-In (popup with automatic redirect fallback for Android WebView)
+    // Check if running on the same Firebase Hosting origin where signInWithRedirect works without storage partitioning errors
+    const isSameFirebaseOrigin =
+      window.location.hostname === firebaseConfig.authDomain ||
+      window.location.hostname === `${firebaseConfig.projectId}.web.app`;
+
+    // Google Sign-In (always use popup first; only fall back to redirect on same-origin Firebase Hosting to prevent "missing initial state")
     document.getElementById("googleLoginBtn").addEventListener("click", async () => {
       const errBox = document.getElementById("authErrorBox");
+      const btn = document.getElementById("googleLoginBtn");
       errBox.classList.add("hidden");
+      btn.disabled = true;
       try {
         await signInWithPopup(auth, googleProvider, browserPopupRedirectResolver);
       } catch (err) {
         if (
-          err?.code === "auth/popup-blocked" ||
-          err?.code === "auth/operation-not-supported-in-this-environment"
+          isSameFirebaseOrigin &&
+          (err?.code === "auth/popup-blocked" ||
+            err?.code === "auth/operation-not-supported-in-this-environment")
         ) {
           showToast("Google लॉगिन के लिए रीडायरेक्ट हो रहा है...");
           await signInWithRedirect(auth, googleProvider, browserPopupRedirectResolver);
@@ -2643,17 +2657,21 @@
           errBox.textContent = getHindiAuthError(err);
           errBox.classList.remove("hidden");
         }
+      } finally {
+        btn.disabled = false;
       }
     });
 
-    // Check redirect login result on boot
-    getRedirectResult(auth, browserPopupRedirectResolver).catch((err) => {
-      if (err) {
-        const errBox = document.getElementById("authErrorBox");
-        errBox.textContent = getHindiAuthError(err);
-        errBox.classList.remove("hidden");
-      }
-    });
+    // Check redirect login result on boot (only relevant on same-origin Firebase Hosting)
+    if (isSameFirebaseOrigin) {
+      getRedirectResult(auth, browserPopupRedirectResolver).catch((err) => {
+        if (err) {
+          const errBox = document.getElementById("authErrorBox");
+          errBox.textContent = getHindiAuthError(err);
+          errBox.classList.remove("hidden");
+        }
+      });
+    }
 
     /* ----------------------------------------------------
        5. PROFILE SETUP (18+ CHECK & PHOTO BASE64)
