@@ -1,0 +1,74 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.role == 'owner' ||
+        request.auth.token.role == 'admin'
+      );
+    }
+
+    function validImage() {
+      return request.resource.contentType.matches('image/.*')
+        && request.resource.size < 8 * 1024 * 1024;
+    }
+
+    function validChatMedia() {
+      return (
+        (request.resource.contentType.matches('image/.*') && request.resource.size < 8 * 1024 * 1024) ||
+        (request.resource.contentType.matches('audio/.*') && request.resource.size < 8 * 1024 * 1024) ||
+        (request.resource.contentType.matches('video/.*') && request.resource.size < 20 * 1024 * 1024)
+      );
+    }
+
+    match /profilePhotos/{uid}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == uid && validImage();
+    }
+
+    match /gallery/{uid}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == uid && validImage();
+    }
+
+    match /posts/{uid}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == uid && validImage();
+    }
+
+    match /chatMedia/{scope}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && validChatMedia();
+    }
+
+    match /chatThemes/{uid}/{fileName} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+      allow write: if isSignedIn() && request.auth.uid == uid && validImage();
+    }
+
+    // Strictly private verification selfies, payment proofs, and support screenshots
+    match /verificationSelfies/{uid}/{fileName} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+      allow write: if isSignedIn() && request.auth.uid == uid && validImage();
+    }
+
+    match /paymentScreenshots/{uid}/{fileName} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+      allow write: if isSignedIn() && request.auth.uid == uid && validImage();
+    }
+
+    match /supportScreenshots/{uid}/{fileName} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+      allow write: if isSignedIn() && request.auth.uid == uid && validImage();
+    }
+
+    match /promoCovers/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() && validImage();
+    }
+  }
+}

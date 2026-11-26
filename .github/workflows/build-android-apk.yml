@@ -1,0 +1,108 @@
+name: Build IG Meet Native Android Release APK & AAB
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Configure google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            echo "$GOOGLE_SERVICES_JSON" > android-app/app/google-services.json
+          elif [ ! -f android-app/app/google-services.json ]; then
+            cp android-app/app/google-services.json.template android-app/app/google-services.json
+          fi
+
+      - name: Decode Release Keystore (if configured)
+        id: keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$ANDROID_KEYSTORE_PASSWORD" ] && [ -n "$ANDROID_KEY_ALIAS" ] && [ -n "$ANDROID_KEY_PASSWORD" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android-app/ig-meet-release.jks
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Release keystore secrets not set. Building debug APK instead. Configure ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, and ANDROID_KEY_PASSWORD for Play-ready signed release builds."
+          fi
+
+      - name: Build Signed Release APK & Play Store AAB
+        if: steps.keystore.outputs.signed == 'true'
+        working-directory: android-app
+        env:
+          KEYSTORE_FILE: ../ig-meet-release.jks
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: gradle assembleRelease bundleRelease --stacktrace
+
+      - name: Verify Signed Release APK Signature
+        if: steps.keystore.outputs.signed == 'true'
+        run: |
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -n 1)
+          "$APKSIGNER" verify --verbose android-app/app/build/outputs/apk/release/app-release.apk
+
+      - name: Build Debug APK (Fallback when keystore secrets are not set)
+        if: steps.keystore.outputs.signed != 'true'
+        working-directory: android-app
+        run: gradle assembleDebug --stacktrace
+
+      - name: Upload Release Artifacts
+        if: steps.keystore.outputs.signed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: IG-Meet-Android-Release
+          path: |
+            android-app/app/build/outputs/apk/release/app-release.apk
+            android-app/app/build/outputs/bundle/release/app-release.aab
+
+      - name: Upload Debug Artifact
+        if: steps.keystore.outputs.signed != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: IG-Meet-Android-Debug-APK
+          path: android-app/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Publish Signed Release to GitHub Releases
+        if: steps.keystore.outputs.signed == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: IG Meet Release v1.0.${{ github.run_number }}
+          files: |
+            android-app/app/build/outputs/apk/release/app-release.apk
+            android-app/app/build/outputs/bundle/release/app-release.aab
+
+      - name: Publish Debug APK to GitHub Releases
+        if: steps.keystore.outputs.signed != 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}-debug
+          name: IG Meet Debug v1.0.${{ github.run_number }}
+          files: android-app/app/build/outputs/apk/debug/app-debug.apk

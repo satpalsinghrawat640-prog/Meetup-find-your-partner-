@@ -1,0 +1,35 @@
+{
+  "project_info": {
+    "project_number": "358917824526",
+    "project_id": "ig-meet--find-your-partner",
+    "storage_bucket": "ig-meet--find-your-partner.firebasestorage.app",
+    "firebase_url": "REPLACE_WITH_REAL_RTDB_URL_FROM_FIREBASE_CONSOLE"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:358917824526:android:3e64ff01a67e9444e79c5f",
+        "android_client_info": {
+          "package_name": "Ig_meet.in"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "REPLACE_WITH_REAL_WEB_CLIENT_ID_FROM_FIREBASE_CONSOLE",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAzbNGUMwNAYAqJXwLhg3wIZzR0pmPMwXI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
